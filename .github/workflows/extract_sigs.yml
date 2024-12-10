@@ -1,0 +1,84 @@
+name: Extract Signatures
+
+on:
+  workflow_dispatch:
+    inputs:
+      versions:
+        description: 'List of BYOND versions to process'
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      versions:
+        description: 'List of BYOND versions to process'
+        required: true
+        type: string
+
+jobs:
+  extract:
+    runs-on: [ubuntu-latest]
+    continue-on-error: true
+    strategy:
+      matrix:
+        byond_version: ${{ fromJson(inputs.versions) }}
+        os: [windows, linux]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install lief
+        pip install colorama
+
+    - name: Set BYOND version
+      run: |
+        BYOND_VERSION="${{ matrix.byond_version }}"
+        # Remove the leading 'v' from the version
+        BYOND_VERSION="${BYOND_VERSION#v}"
+        echo "BYOND_VERSION=$BYOND_VERSION" >> "$GITHUB_ENV"
+
+    - name: Download BYOND
+      run: |
+        MAJOR_VERSION=$(echo "$BYOND_VERSION" | cut -d'.' -f1)
+        if [ "${{ matrix.os }}" == "windows" ]; then
+            DOWNLOAD_URL="https://www.byond.com/download/build/${MAJOR_VERSION}/${BYOND_VERSION}_byond.zip"
+          else
+            DOWNLOAD_URL="https://www.byond.com/download/build/${MAJOR_VERSION}/${BYOND_VERSION}_byond_linux.zip"
+        fi
+        wget $DOWNLOAD_URL -O byond.zip
+        unzip byond.zip
+
+    - name: Determine target file
+      id: determine_target
+      run: |
+        if [ "${{ matrix.os }}" == "windows" ]; then
+          echo "target_file=byond/bin/byondcore.dll" >> "$GITHUB_OUTPUT"
+        else
+          echo "target_file=byond/bin/libbyond.so" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Determine if old ELF format is needed
+      id: determine_elf
+      run: |
+        MINOR_VERSION=$(echo "$BYOND_VERSION" | cut -d'.' -f2)
+        if [ "${{ matrix.os }}" == "linux" ] && [ "$MINOR_VERSION" -lt 1634 ]; then
+          echo "use_old_elf=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "use_old_elf=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Run extraction script
+      run: |
+        if [ "${{ steps.determine_elf.outputs.use_old_elf }}" == "true" ]; then
+          python byond_tracy_offset_extractor.py "${{ steps.determine_target.outputs.target_file }}" --use-old-elf
+        else
+          python byond_tracy_offset_extractor.py "${{ steps.determine_target.outputs.target_file }}"
+        fi

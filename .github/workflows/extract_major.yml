@@ -1,0 +1,45 @@
+name: Extract All Signatures (for a given Major)
+
+on:
+  workflow_dispatch:
+    inputs:
+      major_version:
+        description: 'Major version to process (e.g., 514 or 515)'
+        required: true
+        default: '515'
+
+jobs:
+  extract_all:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Get raw BYOND versions
+      id: get_raw_versions
+      run: |
+        MAJOR_VERSION="${{ github.event.inputs.major_version }}"
+        {
+          echo 'RAW_VERSIONS<<EOF'
+          curl -s https://www.byond.com/download/build/${MAJOR_VERSION}/
+          echo EOF
+        } >> "$GITHUB_ENV"
+
+    - name: Parse and get unique BYOND versions
+      id: parse_versions
+      run: |
+        PARSED_VERSIONS=$(echo "$RAW_VERSIONS" | grep -oP '(?<=href=")${{ github.event.inputs.major_version }}\.\d{4}(?=_byond\.exe)')
+        echo "Parsed versions: $PARSED_VERSIONS"  # Debugging line
+        {
+          echo 'UNIQUE_VERSIONS<<EOF'
+          echo "$PARSED_VERSIONS" | sort -u | jq -R -s -c 'split("\n")[:-1]' | jq 'map("v\(. )")'
+          echo EOF
+        } >> "$GITHUB_ENV"
+
+    - name: Call extract_sigs workflow
+      if: env.UNIQUE_VERSIONS != '[]'
+      run: |
+        gh workflow run extract_sigs.yml -f versions="$UNIQUE_VERSIONS"
+      env:
+        GH_TOKEN: ${{ github.token }}
