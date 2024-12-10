@@ -9,10 +9,12 @@ A Python-based tool for analyzing and extracting patterns and addresses from the
 - **Python 3.12+**
 - **Dependencies**: Install the following Python libraries:
   - [`lief`](https://github.com/lief-project/LIEF)
+  - [`capstone`](https://github.com/capstone-engine/capstone)
   - [`colorama`](https://github.com/tartley/colorama)
   
   ```bash
   pip install lief
+  pip install capstone
   pip install colorma
   ```
 
