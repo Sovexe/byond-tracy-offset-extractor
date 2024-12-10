@@ -35,7 +35,7 @@ PE_BASE_OFFSETS = {
 
 # OLD ELF Base for 1643 and lower
 OLD_ELF_BASE_PATTERN = bytes.fromhex(
-    "8db426000000008b4638894738c7463800000000893424"
+    "8d b4 26 00 00 00 00 8b 46 38 89 47 38 c7 46 38 00 00 00 00 89 34 24"
 )
 OLD_ELF_BASE_OFFSETS = {
     "strings": -0xF2,
@@ -46,7 +46,7 @@ OLD_ELF_BASE_OFFSETS = {
 
 # NEW ELF Base for 1644 and newer
 NEW_ELF_BASE_PATTERN = bytes.fromhex(
-    "8db426000000009083ec0c5383c301"
+    "8d b4 26 00 00 00 00 90 83 ec 0c 53 83 c3 01"
 )
 NEW_ELF_BASE_OFFSETS = {
     "strings": -0x268,
@@ -57,20 +57,20 @@ NEW_ELF_BASE_OFFSETS = {
 
 # Function patterns (exec_proc, server_tick, send_maps)
 # PE exec_proc
-PE_EXEC_PROC_PATTERN = bytes.fromhex("64a10000000050515381ec300a0000")
+PE_EXEC_PROC_PATTERN = bytes.fromhex("64 a1 00 00 00 00 50 51 53 81 ec 30 0a 00 00")
 PE_EXEC_PROC_OFFSETS = {
     "exec_proc": -0x1d
 }
 
 # PE server_tick
-PE_SERVER_TICK_PATTERN = bytes.fromhex("5fb0015ec35f32c05ec3cccc55")
+PE_SERVER_TICK_PATTERN = bytes.fromhex("5f b0 01 5e c3 5f 32 c0 5e c3 cc cc 55")
 PE_SERVER_TICK_OFFSETS = {
     "server_tick": 0xC
 }
 
 # PE send_maps
 PE_SEND_MAPS_PATTERN = bytes.fromhex(
-    "8985b0fbffff898590fbffff8b86080000008995acfbffff89958cfbffff8985b8fbffff"
+    "89 85 b0 fb ff ff 89 85 90 fb ff ff 8b 86 08 00 00 00 89 95 ac fb ff ff 89 95 8c fb ff ff 89 85 b8 fb ff ff"
 )
 PE_SEND_MAPS_OFFSETS = {
     "send_maps": -0x5c
@@ -78,7 +78,7 @@ PE_SEND_MAPS_OFFSETS = {
 
 # OLD ELF exec_proc
 OLD_ELF_EXEC_PROC_PATTERN = bytes.fromhex(
-    "899524f8ffffc7459400000000c7459800000000c7458c00000000c74590000000008985c4f7ffff8b421885c0"
+    "89 95 24 f8 ff ff c7 45 94 00 00 00 00 c7 45 98 00 00 00 00 c7 45 8c 00 00 00 00 c7 45 90 00 00 00 00 89 85 c4 f7 ff ff 8b 42 18 85 c0"
 )
 OLD_ELF_EXEC_PROC_OFFSETS = {
     "exec_proc": -0x17
@@ -86,7 +86,7 @@ OLD_ELF_EXEC_PROC_OFFSETS = {
 
 # OLD ELF server_tick
 OLD_ELF_SERVER_TICK_PATTERN = bytes.fromhex(
-    "8b4dc48955cc8b55c08945c82955c8194dcc8b55c88b4dccc7042401000000"
+    "8b 4d c4 89 55 cc 8b 55 c0 89 45 c8 29 55 c8 19 4d cc 8b 55 c8 8b 4d cc c7 04 24 01 00 00 00"
 )
 OLD_ELF_SERVER_TICK_OFFSETS = {
     "server_tick": -0xC0
@@ -94,7 +94,7 @@ OLD_ELF_SERVER_TICK_OFFSETS = {
 
 # OLD ELF send_maps
 OLD_ELF_SEND_MAPS_PATTERN = bytes.fromhex(
-    "5589e557565381ec2c09000065a100000000898550f7ffff89854cf7ffff80781400"
+    "55 89 e5 57 56 53 81 ec 2c 09 00 00 65 a1 00 00 00 00 89 85 50 f7 ff ff 89 85 4c f7 ff ff 80 78 14 00"
 )
 OLD_ELF_SEND_MAPS_OFFSETS = {
     "send_maps": 0x000
@@ -102,7 +102,7 @@ OLD_ELF_SEND_MAPS_OFFSETS = {
 
 # NEW ELF exec_proc
 NEW_ELF_EXEC_PROC_PATTERN = bytes.fromhex(
-    "8995d8fcffff898500fcffff8b4218c78520fdffff00000000c78524fdffff00000000c78528fdffff00000000c7852cfdffff0000000085c0"
+    "89 95 d8 fc ff ff 89 85 00 fc ff ff 8b 42 18 c7 85 20 fd ff ff 00 00 00 00 c7 85 24 fd ff ff 00 00 00 00 c7 85 28 fd ff ff 00 00 00 00 c7 85 2c fd ff ff 00 00 00 00 85 c0"
 )
 NEW_ELF_EXEC_PROC_OFFSETS = {
     "exec_proc": -0x17
@@ -110,7 +110,7 @@ NEW_ELF_EXEC_PROC_OFFSETS = {
 
 # NEW ELF server_tick
 NEW_ELF_SERVER_TICK_PATTERN = bytes.fromhex(
-    "660f6ec0660f6eca660f62c1660fd60424660f6fd0"
+    "66 0f 6e c0 66 0f 6e ca 66 0f 62 c1 66 0f d6 04 24 66 0f 6f d0"
 )
 NEW_ELF_SERVER_TICK_OFFSETS = {
     "server_tick": -0x2D
@@ -118,7 +118,7 @@ NEW_ELF_SERVER_TICK_OFFSETS = {
 
 # NEW ELF send_maps
 NEW_ELF_SEND_MAPS_PATTERN = bytes.fromhex(
-    "5589e557565381ecec08000065a10000000080781400898578f7ffff898554f7ffff"
+    "55 89 e5 57 56 53 81 ec ec 08 00 00 65 a1 00 00 00 00 80 78 14 00 89 85 78 f7 ff ff 89 85 54 f7 ff ff"
 )
 NEW_ELF_SEND_MAPS_OFFSETS = {
     "send_maps": 0x000
@@ -267,7 +267,7 @@ class ComplexOffsetPattern:
     first_wildcard_pos: int
     second_wildcard_pos: int
 
-# Define complex offset patterns for procdef
+# patterns for procdef
 PROCDEF_COMPLEX_OFFSET_PATTERNS = {
     "PE": ComplexOffsetPattern(
         name="procdef",
@@ -372,11 +372,11 @@ def main():
     else:
         print(f"{INFO}[INFO] Successfully loaded binary: {binary_path}{RESET}")
 
-    # Get the image base
+    # Get image base
     image_base = get_image_base(binary, binary_format)
     print(f"{INFO}[INFO] Image Base (l_addr): 0x{image_base:08X}{RESET}")
 
-    # Get the .text section
+    # Get .text section
     text_section = binary.get_section(".text")
     if not text_section:
         print(f"{ERROR}[ERROR] .text section not found.{RESET}")
@@ -441,7 +441,7 @@ def main():
         if pattern_offset == -1:
             print(f"{WARN}[WARN] Pattern for {pattern_name} not found in the binary.{RESET}")
             return
-        # Compute the RVA of the pattern
+
         pattern_rva = text_va + pattern_offset
         print(f"{INFO}[INFO] {pattern_name} Pattern RVA: 0x{pattern_rva:08X}{RESET}")
 
@@ -454,14 +454,12 @@ def main():
     try_extract("Server_Tick", server_tick_pattern, server_tick_offsets)
     try_extract("Send_Map", send_maps_pattern, send_maps_offsets)
 
-    # Extract the 'procdef' complex offset
     procdef_offset = extract_procdef(text_data, text_va, procdef_pattern, binary_format)
     if procdef_offset:
         all_extracted_addresses["procdef"] = procdef_offset
 
-    # Print results
+    # results
     print(f"\n{RESULTS}[RESULTS] Extracted Addresses:{RESET}")
-    # Define the order of results, including 'procdef'
     final_order = [
         "strings", 
         "strings_len", 
