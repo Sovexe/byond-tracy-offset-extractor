@@ -58,55 +58,51 @@ python binary_analysis.py /path/to/libbyond.so --use-old-elf
 ## Example output
 
 ```
-[INFO] Successfully loaded binary: .\libbyond1647.so
-[INFO] Listing all LOAD segments:
-  LOAD Segment 1: VA=0x0, Size=0x125f3c, Flags=R
-  LOAD Segment 2: VA=0x126000, Size=0x4e6204, Flags=ER
-  LOAD Segment 3: VA=0x60d000, Size=0x1747e8, Flags=R
-  LOAD Segment 4: VA=0x782dbc, Size=0x1b4a0, Flags=WR
-  [INFO] Selected LOAD segment with EXECUTE flag: VA = 0x126000
-[INFO] Image Base (l_addr): 0x00126000
+[INFO] Successfully loaded binary: .\byondcore1647.dll
+[INFO] Image Base (l_addr): 0x10000000
 [INFO] .text section found.
-[INFO] Pattern found at offset: 0x1E0FC8
-[INFO] Base Pattern RVA: 0x00307018
+[DEBUG] .text section VA: 0x00001000, Size: 3675722 bytes
+[DEBUG] Pattern found at offset: 0x001E28F6
+[INFO] Base pattern found at RVA: 0x001E38F6
 [INFO] Computing address for 'strings':
-       Pattern RVA: 0x307018 + Offset: 0x-268 = Pointer RVA: 0x306DB0
-[DEBUG] Read raw value: 0x00787DF0 from RVA: 0x00306DB0
+[DEBUG] Pattern RVA: 0x001E38F6 + Offset: 0x-D4 = Pointer RVA: 0x001E3822
+[DEBUG] Read raw value: 0x1040A6C4 from RVA: 0x001E3822
+[INFO]Adjusted Address for 'strings': 0x0040A6C4
 [INFO] Computing address for 'strings_len':
-       Pattern RVA: 0x307018 + Offset: 0x-1D6 = Pointer RVA: 0x306E42
-[DEBUG] Read raw value: 0x00787DEC from RVA: 0x00306E42
+[DEBUG] Pattern RVA: 0x001E38F6 + Offset: 0x-4E = Pointer RVA: 0x001E38A8
+[DEBUG] Read raw value: 0x1040A6C8 from RVA: 0x001E38A8
+[INFO]Adjusted Address for 'strings_len': 0x0040A6C8
 [INFO] Computing address for 'miscs':
-       Pattern RVA: 0x307018 + Offset: 0x-248 = Pointer RVA: 0x306DD0
-[DEBUG] Read raw value: 0x00787DD8 from RVA: 0x00306DD0
+[DEBUG] Pattern RVA: 0x001E38F6 + Offset: 0x-B8 = Pointer RVA: 0x001E383E
+[DEBUG] Read raw value: 0x1040A6D4 from RVA: 0x001E383E
+[INFO]Adjusted Address for 'miscs': 0x0040A6D4
 [INFO] Computing address for 'procdefs':
-       Pattern RVA: 0x307018 + Offset: 0x-294 = Pointer RVA: 0x306D84
-[DEBUG] Read raw value: 0x00787D98 from RVA: 0x00306D84
-[INFO] Pattern found at offset: 0x223647
-[INFO] Exec_Proc Pattern RVA: 0x00349697
-[INFO] Computing address for 'exec_proc':
-       Pattern RVA: 0x349697 + Offset: 0x-17 = Pointer RVA: 0x349680
-       Computed Address for 'exec_proc': 0x00349680
-[INFO] Pattern found at offset: 0x20F3AD
-[INFO] Server_Tick Pattern RVA: 0x003353FD
-[INFO] Computing address for 'server_tick':
-       Pattern RVA: 0x3353FD + Offset: 0x-2D = Pointer RVA: 0x3353D0
-       Computed Address for 'server_tick': 0x003353D0
-[INFO] Pattern found at offset: 0x1FDAD0
-[INFO] Send_Map Pattern RVA: 0x00323B20
-[INFO] Computing address for 'send_maps':
-       Pattern RVA: 0x323B20 + Offset: 0x0 = Pointer RVA: 0x323B20
-       Computed Address for 'send_maps': 0x00323B20
-[INFO] Wildcard pattern 'procdef' found at offset: 0x2147A3
-[INFO] procdef Pattern RVA: 0x0033A7F3
+[DEBUG] Pattern RVA: 0x001E38F6 + Offset: 0x-F8 = Pointer RVA: 0x001E37FE
+[DEBUG] Read raw value: 0x1040A6E4 from RVA: 0x001E37FE
+[INFO]Adjusted Address for 'procdefs': 0x0040A6E4
+[DEBUG] Wildcard pattern 'procdef' found at offset: 0x0010EF7D
+[INFO] procdef Pattern RVA: 0x0010FF7D
 [INFO] Extracted procdef: 0x001C002C
+[DEBUG] Pattern found at offset: 0x0013027D
+[INFO] exec_proc RVA: 0x00131260
+[DEBUG] Pattern found at offset: 0x0020B424
+[INFO] server_tick RVA: 0x0020C430
+[DEBUG] Pattern found at offset: 0x001C32AC
+[INFO] send_maps RVA: 0x001C4250
+[INFO] Prologue length for exec_proc: 6 bytes
+[INFO] Prologue length for server_tick: 6 bytes
+[INFO] Prologue length for send_maps: 5 bytes
 
-[RESULTS] Extracted Addresses:
-  strings: 0x00787DF0
-  strings_len: 0x00787DEC
-  miscs: 0x00787DD8
-  procdefs: 0x00787D98
+Extracted Addresses:
+  strings: 0x0040A6C4
+  strings_len: 0x0040A6C8
+  miscs: 0x0040A6D4
+  procdefs: 0x0040A6E4
   procdef: 0x001C002C
-  exec_proc: 0x00349680
-  server_tick: 0x003353D0
-  send_maps: 0x00323B20
+  exec_proc: 0x00131260
+  server_tick: 0x0020C430
+  send_maps: 0x001C4250
+  prologue: 0x00050606
+
+{0x0040A6C4, 0x0040A6C8, 0x0040A6D4, 0x0040A6E4, 0x001C002C, 0x00131260, 0x0020C430, 0x001C4250, 0x00050606}
 ```

@@ -238,7 +238,7 @@ def generate_combined_prologue_value(prologue_lengths):
         exec_proc = prologue_lengths.get("exec_proc", 0) or 0
         server_tick = prologue_lengths.get("server_tick", 0) or 0
         send_maps = prologue_lengths.get("send_maps", 0) or 0
-        combined_value = f"0x00{exec_proc:02X}{server_tick:02X}{send_maps:02X}"
+        combined_value = f"0x00{send_maps:02X}{server_tick:02X}{exec_proc:02X}"
         return combined_value
     except Exception as e:
         print(f"{ERROR}[ERROR] Failed to generate combined prologue value: {e}{RESET}")
