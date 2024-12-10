@@ -1,0 +1,29 @@
+name: Extract All Signatures (for a given Major)
+
+on: [workflow_dispatch]
+
+inputs:
+  major_version:
+    description: 'Major version to process (e.g., 514 or 515)'
+    required: true
+    default: '515'
+
+jobs:
+  extract_all:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Get BYOND versions
+      id: get_versions
+      run: |
+        MAJOR_VERSION="${{ github.event.inputs.major_version }}"
+        VERSIONS=$(curl -s https://www.byond.com/download/build/${MAJOR_VERSION}/ | grep -oP '${MAJOR_VERSION}\.\d{4}' | sort -u | jq -R -s -c 'split("\n")[:-1]')
+        echo "versions=$VERSIONS" >> $GITHUB_OUTPUT
+
+    - name: Call extract_sigs workflow
+      uses: ./.github/workflows/extract_sigs.yml
+      with:
+        versions: ${{ steps.get_versions.outputs.versions }}

@@ -1,0 +1,62 @@
+name: Extract Signatures
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      versions:
+        description: 'List of BYOND versions to process'
+        required: true
+        type: array
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        byond_version: ${{ inputs.versions }}
+        os: [windows, linux]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install lief
+        pip install colorama
+
+    - name: Download BYOND
+      run: |
+        BYOND_VERSION=${{ matrix.byond_version }}
+        if [ "${{ matrix.os }}" == "windows" ]; then
+          DOWNLOAD_URL="https://www.byond.com/download/build/${BYOND_VERSION}/${BYOND_VERSION}_byond.zip"
+        else
+          DOWNLOAD_URL="https://www.byond.com/download/build/${BYOND_VERSION}/${BYOND_VERSION}_byond_linux.zip"
+        fi
+        wget $DOWNLOAD_URL -O byond.zip
+        unzip byond.zip -d byond
+
+    - name: Run extraction script
+      run: |
+        if [ "${{ matrix.os }}" == "windows" ]; then
+          TARGET_FILE="byond/bin/byondcore.dll"
+        else
+          TARGET_FILE="byond/bin/libbyond.so"
+        fi
+        BYOND_VERSION=${{ matrix.byond_version }}
+        MINOR_VERSION=$(echo "$BYOND_VERSION" | cut -d'.' -f2)
+        if [ "${{ matrix.os }}" == "linux" ] && [ "$MINOR_VERSION" -lt 1634 ]; then
+          python extract_sigs.py "$TARGET_FILE" --use-old-elf
+        else
+          python extract_sigs.py "$TARGET_FILE"
+        fi
