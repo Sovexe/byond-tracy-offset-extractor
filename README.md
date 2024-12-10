@@ -39,7 +39,7 @@ python binary_analysis.py <binary_path> [--use-old-elf]
 python binary_analysis.py C:\path\to\byondcore.dll
 ```
 
-#### Analyze an ELF Binary (New Format)
+#### Analyze an ELF Binary
 
 ```bash
 python binary_analysis.py /path/to/libbyond.so
