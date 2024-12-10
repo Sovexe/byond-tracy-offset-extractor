@@ -171,18 +171,21 @@ def get_image_base(binary, binary_format):
         for i, segment in enumerate(binary.segments):
             if segment.type == 1:  # PT_LOAD segment
                 flags = []
-                if segment.flags & 0x1:  # PF_X
+                # Fix for newer python versions: Access the integer value of flags
+                flags_value = segment.flags.value
+
+                if flags_value & 0x1:  # PF_X
                     flags.append('E')
-                if segment.flags & 0x2:  # PF_W
+                if flags_value & 0x2:  # PF_W
                     flags.append('W')
-                if segment.flags & 0x4:  # PF_R
+                if flags_value & 0x4:  # PF_R
                     flags.append('R')
                 flags_str = ''.join(flags)
                 print(f"  LOAD Segment {i+1}: VA={hex(segment.virtual_address)}, Size={hex(segment.virtual_size)}, Flags={flags_str}")
 
         # Find the first LOAD segment with execute flag
         for segment in binary.segments:
-            if (segment.type == 1 and (segment.flags & 0x1)):  # PF_X
+            if (segment.type == 1 and (segment.flags.value & 0x1)):  # PF_X
                 print(f"{INFO}  [INFO] Selected LOAD segment with EXECUTE flag: VA = {hex(segment.virtual_address)}{RESET}")
                 return segment.virtual_address
         # Fallback to first LOAD segment if no EXECUTE flag is found
