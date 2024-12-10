@@ -6,7 +6,7 @@ A Python-based tool for analyzing and extracting patterns and addresses from the
 
 ## Requirements
 
-- **Python 3.7+**
+- **Python 3.12+**
 - **Dependencies**: Install the following Python libraries:
   - [`lief`](https://github.com/lief-project/LIEF)
   - [`colorama`](https://github.com/tartley/colorama)
