@@ -184,10 +184,8 @@ def compute_addresses(binary, pattern_rva, image_base, relative_offsets, binary_
                 addresses[name] = None
                 print(f"{WARN}[WARN] Could not read pointer for '{name}'.{RESET}")
             else:
-               
                 adjusted_address = raw_value - image_base
                 print(f"{INFO}[INFO]Adjusted Address for '{name}': 0x{adjusted_address:08X}{RESET}")
-
                 addresses[name] = adjusted_address
 
     return addresses
