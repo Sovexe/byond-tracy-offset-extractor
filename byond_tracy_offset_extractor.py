@@ -184,11 +184,10 @@ def compute_addresses(binary, pattern_rva, image_base, relative_offsets, binary_
                 addresses[name] = None
                 print(f"{WARN}[WARN] Could not read pointer for '{name}'.{RESET}")
             else:
-                if binary_format == 'PE':
-                    adjusted_address = raw_value - image_base
-                    print(f"{INFO}[INFO]Adjusted Address for '{name}': 0x{adjusted_address:08X}{RESET}")
-                else:
-                    adjusted_address = raw_value
+               
+                adjusted_address = raw_value - image_base
+                print(f"{INFO}[INFO]Adjusted Address for '{name}': 0x{adjusted_address:08X}{RESET}")
+
                 addresses[name] = adjusted_address
 
     return addresses
@@ -217,11 +216,11 @@ def calculate_prologue_length(binary, function_rva, min_bytes=5):
 
     return total_length
 
-def calculate_prologue_lengths(binary, offsets):
+def calculate_prologue_lengths(binary, offsets, load_address):
     prologue_lengths = {}
     for func in ["exec_proc", "server_tick", "send_maps"]:
         if func in offsets and offsets[func] is not None:
-            prologue_length = calculate_prologue_length(binary, offsets[func])
+            prologue_length = calculate_prologue_length(binary, offsets[func] + load_address)
             if prologue_length:
                 prologue_lengths[func] = prologue_length
                 print(f"{INFO}[INFO] Prologue length for {func}: {prologue_length} bytes{RESET}")
@@ -268,6 +267,53 @@ def extract_procdef(data: bytes, base_address: int, procdef_pattern: ComplexOffs
 
     return complex_offset
 
+def get_image_base(binary: lief.Binary, binary_format: str) -> int:
+    """
+    Retrieve the image base for the binary.
+    - For PE, use the image base from the optional header.
+    - For ELF, calculate the image base as the minimum virtual address of PT_LOAD segments.
+    """
+    if binary_format == 'PE':
+        image_base = binary.optional_header.imagebase
+        print(f"{INFO}[INFO] Image Base (PE): 0x{image_base:08X}{RESET}")
+        return image_base
+    elif binary_format == 'ELF':
+        # Find the minimum virtual address of all PT_LOAD segments
+        load_segments = [seg for seg in binary.segments if seg.type == lief.ELF.Segment.TYPE.LOAD]
+        if not load_segments:
+            print(f"{ERROR}[ERROR] No PT_LOAD segments found in ELF binary.{RESET}")
+            sys.exit(1)
+        # Calculate the minimum virtual address of all PT_LOAD segments
+        image_base = min(seg.virtual_address for seg in load_segments)
+        print(f"{INFO}[INFO] Calculated Image Base (ELF): 0x{image_base:08X}{RESET}")
+        return image_base
+    else:
+        print(f"{ERROR}[ERROR] Unsupported binary format: {binary_format}.{RESET}")
+        sys.exit(1)
+
+def get_load_address(binary: lief.Binary, binary_format: str) -> int:
+    """
+    Retrieve the load address for the binary.
+    - For ELF, this is the virtual address of the first executable PT_LOAD segment.
+    - For PE, return 0 since the load address is effectively the image base.
+    """
+    if binary_format == 'PE':
+        return 0  # No separate load address for PE binaries
+    elif binary_format == 'ELF':
+        exec_segments = [
+            seg for seg in binary.segments
+            if seg.type == lief.ELF.Segment.TYPE.LOAD and lief.ELF.Segment.FLAGS.X in seg.flags
+        ]
+        if not exec_segments:
+            print(f"{ERROR}[ERROR] No executable PT_LOAD segments found in ELF binary.{RESET}")
+            return 0
+        load_address = exec_segments[0].virtual_address
+        print(f"{INFO}[INFO] Load Address (ELF): 0x{load_address:08X}{RESET}")
+        return load_address
+    else:
+        print(f"{ERROR}[ERROR] Unsupported binary format: {binary_format}.{RESET}")
+        return 0
+
 def main():
     args = sys.argv[1:]
     if not args:
@@ -308,9 +354,10 @@ def main():
     else:
         print(f"{INFO}[INFO] Successfully loaded binary: {binary_path}{RESET}")
 
-    image_base = binary.imagebase
-    print(f"{INFO}[INFO] Image Base (l_addr): 0x{image_base:08X}{RESET}")
-
+    # Get our load address, 0 if PE, ELF can vary
+    load_address = get_load_address(binary, binary_format)
+    image_base = get_image_base(binary, binary_format) + load_address
+    
     text_section = binary.get_section(".text")
     if not text_section:
         print(f"{ERROR}[ERROR] .text section not found.{RESET}")
@@ -344,7 +391,7 @@ def main():
     # Extract base offsets
     base_pattern_offset = find_pattern(text_data, base_pattern)
     if base_pattern_offset != -1:
-        base_rva = text_va + base_pattern_offset
+        base_rva = text_va + base_pattern_offset # add text_va as we searched the content of .text which is slightly offset from image_base
         print(f"{INFO}[INFO] Base pattern found at RVA: 0x{base_rva:08X}{RESET}")
         extracted_base = compute_addresses(binary, base_rva, image_base, base_offsets, binary_format)
         all_extracted_addresses.update({k: v for k, v in extracted_base.items() if v is not None})
@@ -361,7 +408,7 @@ def main():
     for func, data in patterns_and_offsets.items():
         pattern_offset = find_pattern(text_data, data["pattern"])
         if pattern_offset != -1:
-            final_rva = text_va + pattern_offset + data["offset"]
+            final_rva = text_va + pattern_offset + data["offset"] - load_address
             offsets[func] = final_rva
             print(f"{INFO}[INFO] {func} RVA: 0x{final_rva:08X}{RESET}")
         else:
@@ -369,7 +416,7 @@ def main():
             offsets[func] = None
 
     # Calculate prologue lengths
-    prologue_lengths = calculate_prologue_lengths(binary, offsets)
+    prologue_lengths = calculate_prologue_lengths(binary, offsets, load_address)
 
     # Generate combined prologue value
     combined_prologue_value = generate_combined_prologue_value(prologue_lengths)
