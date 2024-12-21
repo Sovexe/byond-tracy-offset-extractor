@@ -58,51 +58,62 @@ python binary_analysis.py /path/to/libbyond.so --use-old-elf
 ## Example output
 
 ```
-[INFO] Successfully loaded binary: .\byondcore1647.dll
-[INFO] Image Base (l_addr): 0x10000000
+[INFO] Successfully loaded binary: .\byondcore1648.dll
+[INFO] Image Base (PE): 0x10000000
 [INFO] .text section found.
-[DEBUG] .text section VA: 0x00001000, Size: 3675722 bytes
-[DEBUG] Pattern found at offset: 0x001E28F6
-[INFO] Base pattern found at RVA: 0x001E38F6
-[INFO] Computing address for 'strings':
-[DEBUG] Pattern RVA: 0x001E38F6 + Offset: 0x-D4 = Pointer RVA: 0x001E3822
-[DEBUG] Read raw value: 0x1040A6C4 from RVA: 0x001E3822
-[INFO]Adjusted Address for 'strings': 0x0040A6C4
+[DEBUG] .text section VA: 0x00001000, Size: 3778058 bytes
+[INFO] Searching for Memory Diagnostics Anchor Pattern...
+[DEBUG] Pattern found at offset: 0x00116370
+[INFO] Memory Diagnostics Anchor found at RVA: 0x00117370
 [INFO] Computing address for 'strings_len':
-[DEBUG] Pattern RVA: 0x001E38F6 + Offset: 0x-4E = Pointer RVA: 0x001E38A8
-[DEBUG] Read raw value: 0x1040A6C8 from RVA: 0x001E38A8
-[INFO]Adjusted Address for 'strings_len': 0x0040A6C8
-[INFO] Computing address for 'miscs':
-[DEBUG] Pattern RVA: 0x001E38F6 + Offset: 0x-B8 = Pointer RVA: 0x001E383E
-[DEBUG] Read raw value: 0x1040A6D4 from RVA: 0x001E383E
-[INFO]Adjusted Address for 'miscs': 0x0040A6D4
-[INFO] Computing address for 'procdefs':
-[DEBUG] Pattern RVA: 0x001E38F6 + Offset: 0x-F8 = Pointer RVA: 0x001E37FE
-[DEBUG] Read raw value: 0x1040A6E4 from RVA: 0x001E37FE
-[INFO]Adjusted Address for 'procdefs': 0x0040A6E4
-[DEBUG] Wildcard pattern 'procdef' found at offset: 0x0010EF7D
-[INFO] procdef Pattern RVA: 0x0010FF7D
+[DEBUG] Pattern RVA: 0x00117370 + Offset: 0x19 = Pointer RVA: 0x00117389
+[DEBUG] Read raw value: 0x1042497C from RVA: 0x00117389
+[INFO] Adjusted Address for 'strings_len': 0x0042497C
+[INFO] Computing address for 'procdefs_len':
+[DEBUG] Pattern RVA: 0x00117370 + Offset: 0x-96 = Pointer RVA: 0x001172DA
+[DEBUG] Read raw value: 0x1042499C from RVA: 0x001172DA
+[INFO] Adjusted Address for 'procdefs_len': 0x0042499C
+[INFO] Computing address for 'miscs_len':
+[DEBUG] Pattern RVA: 0x00117370 + Offset: 0x16F = Pointer RVA: 0x001174DF
+[DEBUG] Read raw value: 0x1042498C from RVA: 0x001174DF
+[INFO] Adjusted Address for 'miscs_len': 0x0042498C
+[DEBUG] Constructed pattern for 'strings': 8B 4D 08 3B 0D 7C 49 42 10 73 10 A1 ?? ?? ?? ?? 8B ?? 88
+[DEBUG] Wildcard pattern 'strings_pattern' found at offset: 0x0021FE33
+[DEBUG] Array pointer for 'strings' found at offset 0x0021FE33: 0x00424978
+[DEBUG] Constructed pattern for 'procdefs': 3B 05 9C 49 42 10 72 04 33 C0 5D C3 6B C0 ?? 03 05 ?? ?? ?? ??
+[DEBUG] Wildcard pattern 'procdefs_pattern' found at offset: 0x0021FE16
+[DEBUG] Array pointer for 'procdefs' found at offset 0x0021FE16: 0x00424998
+[DEBUG] Constructed pattern for 'miscs': 3B 0D 8C 49 42 10 72 04 33 C0 5D C3 A1 ?? ?? ?? ?? 8B ?? 88
+[DEBUG] Wildcard pattern 'miscs_pattern' found at offset: 0x001FC0F6
+[DEBUG] Array pointer for 'miscs' found at offset 0x001FC0F6: 0x00424988
+[DEBUG] Wildcard pattern 'procdef' found at offset: 0x001162AD
+[INFO] procdef Pattern RVA: 0x001172AD
 [INFO] Extracted procdef: 0x001C002C
-[DEBUG] Pattern found at offset: 0x0013027D
-[INFO] exec_proc RVA: 0x00131260
-[DEBUG] Pattern found at offset: 0x0020B424
-[INFO] server_tick RVA: 0x0020C430
-[DEBUG] Pattern found at offset: 0x001C32AC
-[INFO] send_maps RVA: 0x001C4250
-[INFO] Prologue length for exec_proc: 6 bytes
-[INFO] Prologue length for server_tick: 6 bytes
+[DEBUG] Wildcard pattern 'exec_proc_pattern' found at offset: 0x00139660
+[INFO] exec_proc RVA: 0x0013A660
+[DEBUG] Wildcard pattern 'server_tick_pattern' found at offset: 0x00222A60
+[INFO] server_tick RVA: 0x00223A60
+[DEBUG] Wildcard pattern 'send_maps_pattern' found at offset: 0x001D4DD0
+[INFO] send_maps RVA: 0x001D5DD0
+[DEBUG] Function RVA: 0x001D5DD0, .text VA: 0x00001000, Offset: 0x001D4DD0
 [INFO] Prologue length for send_maps: 5 bytes
+[DEBUG] Function RVA: 0x00223A60, .text VA: 0x00001000, Offset: 0x00222A60
+[INFO] Prologue length for server_tick: 6 bytes
+[DEBUG] Function RVA: 0x0013A660, .text VA: 0x00001000, Offset: 0x00139660
+[INFO] Prologue length for exec_proc: 6 bytes
 
 Extracted Addresses:
-  strings: 0x0040A6C4
-  strings_len: 0x0040A6C8
-  miscs: 0x0040A6D4
-  procdefs: 0x0040A6E4
+  strings: 0x00424978
+  strings_len: 0x0042497C
+  miscs: 0x00424988
+  miscs_len: 0x0042498C
+  procdefs: 0x00424998
+  procdefs_len: 0x0042499C
   procdef: 0x001C002C
-  exec_proc: 0x00131260
-  server_tick: 0x0020C430
-  send_maps: 0x001C4250
+  exec_proc: 0x0013A660
+  server_tick: 0x00223A60
+  send_maps: 0x001D5DD0
   prologue: 0x00050606
 
-{0x0040A6C4, 0x0040A6C8, 0x0040A6D4, 0x0040A6E4, 0x001C002C, 0x00131260, 0x0020C430, 0x001C4250, 0x00050606}
+{0x00424978, 0x0042497C, 0x00424988, 0x0042498C, 0x00424998, 0x0042499C, 0x001C002C, 0x0013A660, 0x00223A60, 0x001D5DD0, 0x00050606}
 ```
