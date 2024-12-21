@@ -15,7 +15,7 @@ A Python-based tool for analyzing and extracting patterns and addresses from the
   ```bash
   pip install lief
   pip install capstone
-  pip install colorma
+  pip install colorama
   ```
 
 ---
