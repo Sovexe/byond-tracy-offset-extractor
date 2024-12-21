@@ -70,7 +70,7 @@ jobs:
       id: determine_elf
       run: |
         MINOR_VERSION=$(echo "$BYOND_VERSION" | cut -d'.' -f2)
-        if [ "${{ matrix.os }}" == "linux" ] && [ "$MINOR_VERSION" -lt 1634 ]; then
+        if [ "${{ matrix.os }}" == "linux" ] && [ "$MINOR_VERSION" -lt 1644 ]; then
           echo "use_old_elf=true" >> "$GITHUB_OUTPUT"
         else
           echo "use_old_elf=false" >> "$GITHUB_OUTPUT"
