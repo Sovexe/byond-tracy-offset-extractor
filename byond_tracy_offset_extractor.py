@@ -9,11 +9,10 @@ import lief
 import sys
 import os
 from typing import List, Optional
-from dataclasses import dataclass
 from colorama import Fore, Style, init
 from capstone import Cs, CS_ARCH_X86, CS_MODE_32
 
-# colorama
+# Initialize colorama
 init(autoreset=True)
 INFO = Fore.CYAN
 DEBUG = Fore.MAGENTA
@@ -22,39 +21,135 @@ WARN = Fore.YELLOW
 RESULTS = Fore.GREEN
 RESET = Style.RESET_ALL
 
-# Base Patterns and Offsets
-PE_BASE_PATTERN = bytes.fromhex("4b 8b 34 98 85 f6 74 4f 8b 4e 38 c7 45 fc 00 00 00 00 85 c9")
-PE_BASE_OFFSETS = {
-    "strings": -0xD4,
-    "strings_len": -0x4E,
-    "miscs": -0xB8,
-    "procdefs": -0xF8,
-}
-
-OLD_ELF_BASE_PATTERN = bytes.fromhex("8d b4 26 00 00 00 00 8b 46 38 89 47 38 c7 46 38 00 00 00 00 89 34 24")
-OLD_ELF_BASE_OFFSETS = {
-    "strings": -0xF2,
-    "strings_len": -0x5D,
-    "miscs": -0xD1,
-    "procdefs": -0x120,
-}
-
-NEW_ELF_BASE_PATTERN = bytes.fromhex("8d b4 26 00 00 00 00 90 83 ec 0c 53 83 c3 01")
-NEW_ELF_BASE_OFFSETS = {
-    "strings": -0x268,
-    "strings_len": -0x1D6,
-    "miscs": -0x248,
-    "procdefs": -0x294,
+# Define the Memory Diagnostics Anchor Patterns and Relative Offsets for PE and ELF
+PATTERNS_AND_OFFSETS = {
+    "PE": {
+        "anchor_pattern": bytes.fromhex("8a 01 41 84 c0 75 f9 2b ca 89 4e 18 8b 55 f0"),
+        "offsets": {
+            "strings_len": 0x19,     # Example offset for strings_len
+            "procdefs_len": -0x96,  # Example offset for procdefs_len
+            "miscs_len": 0x16F,     # Example offset for miscs_len
+        },
+        "array_patterns": {
+            "strings": {
+                "pattern": [
+                    0x3B, 0x0D, None, None, None, None, 0x73, 0x10, 0xA1, None, None, None, None,
+                    0x8B, 0x04, 0x88, 0x85, 0xC0
+                ],
+                "pointer_offset": 9  # Position to extract the array pointer
+            },
+            "procdefs": {
+                "pattern": [
+                    0x3B, 0x05, None, None, None, None, 0x72, 0x04, 0x33, 0xC0, 0x5D, 0xC3,
+                    0x6B, 0xC0, 0x2C, 0x03, 0x05, None, None, None, None
+                ],
+                "pointer_offset": 17  # Position to extract the array pointer
+            },
+            "miscs": {
+                "pattern": [
+                    0x3B, 0x0D, None, None, None, None, 0x72, 0x04, 0x33, 0xC0, 0x5D, 0xC3,
+                    0xA1, None, None, None, None
+                ],
+                "pointer_offset": 13  # Position to extract the array pointer
+            }
+        },
+        "procdef_pattern": {
+            "pattern": [
+                0xFF, 0x70, None, 0xE8, None, None, None, None, 0x83, 0xC4, 0x04,
+                0x85, 0xC0, 0x75, 0x04, 0x33, 0xC9, 0xEB, 0x0A, 0x0F, 0xB7, 0x00,
+                0x8D, 0x0C, 0x85, 0x0C, 0x00, 0x00, 0x00, 0x8B, 0x45, 0xF0, 0x83,
+                0xC0, None
+            ],
+            "wildcard_positions": [2, 34]  # Corrected positions for PE
+        }
+    },
+    "OLD_ELF": {
+        "anchor_pattern": bytes.fromhex("55 89 e5 57 56 8d 45 d4 53 83 ec 58 50"),
+        "offsets": {
+            "strings_len": 0x2A2,
+            "procdefs_len": -0x120,
+            "miscs_len": -0xD1,
+        },
+        "array_patterns": {
+            "strings": {
+                "pattern": [
+                    0x3B, 0x0D, None, None, None, None, 0x73, 0x10, 0xA1, None, None, None, None,
+                    0x8B, 0x04, 0x88, 0x85, 0xC0
+                ],
+                "pointer_offset": 9
+            },
+            "procdefs": {
+                "pattern": [
+                    0x3B, 0x05, None, None, None, None, 0x72, 0x04, 0x33, 0xC0, 0x5D, 0xC3,
+                    0x6B, 0xC0, 0x2C, 0x03, 0x05, None, None, None, None
+                ],
+                "pointer_offset": 17
+            },
+            "miscs": {
+                "pattern": [
+                    0x3B, 0x0D, None, None, None, None, 0x72, 0x04, 0x33, 0xC0, 0x5D, 0xC3,
+                    0xA1, None, None, None, None
+                ],
+                "pointer_offset": 13
+            }
+        },
+        "procdef_pattern": {
+            "pattern": [
+                0x8B, 0x40, None, 0x89, 0x04, 0x24, None, None, None, None, None,
+                0x31, 0xD2, 0x85, 0xC0, 0x74, 0x0A, 0x0F, 0xB7, 0x00, 0x8D,
+                0x14, 0x85, 0x0C, 0x00, 0x00, 0x00, 0x8B, 0x45, 0xE0, 0x8D,
+                0x44, 0x02, None
+            ],
+            "wildcard_positions": [2, 33]  # Positions to extract bytes for procdef
+        }
+    },
+    "NEW_ELF": {
+        "anchor_pattern": bytes.fromhex("55 89 e5 57 56 8d 45 d4 53 83 ec 58 50"),
+        "offsets": {
+            "strings_len": 0x2A2,
+            "procdefs_len": 0x1EF,
+            "miscs_len": 0x3A4,
+        },
+        "array_patterns": {
+            "strings": {
+                "pattern": [
+                    0x8b, 0x44, 0x24, 0x20, 0x39, 0x05, None, None, None, None, 0x76, 0x17, 0x8b, 0x15, None, None, None, None
+                ],
+                "pointer_offset": 14
+            },
+            "procdefs": {
+                "pattern": [                                                                           #None here as the array value length has varied in the past
+                    0x8b, 0x44, 0x24, 0x04, 0x39, 0x05, None, None, None, None, 0x76, 0x14, 0x6b, 0xc0, None, 0x03, 0x05, None, None, None, None
+                ],
+                "pointer_offset": 17
+            },
+            "miscs": {
+                "pattern": [
+                    0x8b, 0x44, 0x24, 0x04, 0x39, 0x05, None, None, None, None, 0x76, 0x14, 0x8b, 0x15, None, None, None, None
+                ],
+                "pointer_offset": 14
+            }
+        },
+        "procdef_pattern": {
+            "pattern": [
+                0xFF, 0x70, None, 0xE8, None, None, None, None, 0x83, 0xC4, 0x10,
+                0x85, 0xC0, 0x0F, 0x84, 0x1A, 0x05, 0x00, 0x00, 0x0F, 0xB7, 0x00,
+                0x8D, 0x14, 0x85, 0x0C, 0x00, 0x00, 0x00, 0x8B, 0x45, 0xC8, 0x8D,
+                0x44, 0x02, None
+            ],
+            "wildcard_positions": [2, 35]  # Corrected positions for NEW_ELF
+        }
+    }
 }
 
 FUNC_PATTERNS_AND_OFFSETS = {
     "PE": {
-        "exec_proc": {"pattern": bytes.fromhex("64 a1 00 00 00 00 50 51 53 81 ec 30 0a 00 00"), "offset": -0x1D},
-        "server_tick": {"pattern": bytes.fromhex("5f b0 01 5e c3 5f 32 c0 5e c3 cc cc 55"), "offset": 0xC},
+        "exec_proc": {"pattern": bytes.fromhex("64 a1 00 00 00 00 50 51 53 81 ec"), "offset": -0x1D},
+        "server_tick": {"pattern": bytes.fromhex("5f b0 01 5e c3 5f 32 c0 5e c3 cc cc 55"), "offset": 0x0C},
         "send_maps": {"pattern": bytes.fromhex("89 85 b0 fb ff ff 89 85 90 fb ff ff 8b 86 08 00 00 00 89 95 ac fb ff ff 89 95 8c fb ff ff 89 85 b8 fb ff ff"), "offset": -0x5C},
     },
     "NEW_ELF": {
-        "exec_proc": {"pattern": bytes.fromhex("89 95 d8 fc ff ff 89 85 00 fc ff ff 8b 42 18 c7 85 20 fd ff ff 00 00 00 00"), "offset": -0x17},
+        "exec_proc": {"pattern": bytes.fromhex("8d 74 26 00 55 89 e5 57 56 53 81 ec 0c"), "offset": 0x04},
         "server_tick": {"pattern": bytes.fromhex("66 0f 6e c0 66 0f 6e ca 66 0f 62 c1 66 0f d6 04 24"), "offset": -0x2D},
         "send_maps": {"pattern": bytes.fromhex("55 89 e5 57 56 53 81 ec ec 08 00 00 65 a1 00 00 00 00"), "offset": 0x000},
     },
@@ -68,50 +163,7 @@ FUNC_PATTERNS_AND_OFFSETS = {
 FUNCTION_NAMES = {"exec_proc", "send_maps", "server_tick"}
 POINTER_BYTE_LENGTH = 4
 
-@dataclass
-class ComplexOffsetPattern:
-    name: str
-    pattern: List[Optional[int]]
-    first_wildcard_pos: int
-    second_wildcard_pos: int
-
-PROCDEF_COMPLEX_OFFSET_PATTERNS = {
-    "PE": ComplexOffsetPattern(
-        name="procdef",
-        pattern=[
-            0xff, 0x70, None, 0xe8, None, None, None, None, 0x83, 0xc4, 0x04,
-            0x85, 0xc0, 0x75, 0x04, 0x33, 0xc9, 0xeb, 0x0a, 0x0f, 0xb7, 0x00,
-            0x8d, 0x0c, 0x85, 0x0c, 0x00, 0x00, 0x00, 0x8b, 0x45, 0xf0, 0x83,
-            0xc0, None
-        ],
-        first_wildcard_pos=2,
-        second_wildcard_pos=34
-    ),
-    "ELF_old": ComplexOffsetPattern(
-        name="procdef",
-        pattern=[
-            0x8b, 0x40, None, 0x89, 0x04, 0x24, None, None, None, None, None,
-            0x31, 0xd2, 0x85, 0xc0, 0x74, 0x0a, 0x0f, 0xb7, 0x00, 0x8d,
-            0x14, 0x85, 0x0c, 0x00, 0x00, 0x00, 0x8b, 0x45, 0xe0, 0x8d,
-            0x44, 0x02, None
-        ],
-        first_wildcard_pos=2,
-        second_wildcard_pos=33
-    ),
-    "ELF_new": ComplexOffsetPattern(
-        name="procdef",
-        pattern=[
-            0xff, 0x70, None, 0xe8, None, None, None, None, 0x83, 0xc4, 0x10,
-            0x85, 0xc0, 0x0f, 0x84, 0x1a, 0x05, 0x00, 0x00, 0x0f, 0xb7, 0x00,
-            0x8d, 0x14, 0x85, 0x0c, 0x00, 0x00, 0x00, 0x8b, 0x45, 0xc8, 0x8d,
-            0x44, 0x02, None
-        ],
-        first_wildcard_pos=2,
-        second_wildcard_pos=35
-    )
-}
-
-def find_pattern(data, pattern):
+def find_pattern(data: bytes, pattern: bytes) -> int:
     if not pattern:
         return -1
     index = data.find(pattern)
@@ -121,7 +173,7 @@ def find_pattern(data, pattern):
         print(f"{WARN}[WARN] Pattern not found for a given pattern.{RESET}")
     return index
 
-def find_pattern_with_wildcards(data, pattern, pattern_name):
+def find_pattern_with_wildcards(data: bytes, pattern: List[Optional[int]], pattern_name: str) -> int:
     pattern_length = len(pattern)
     for i in range(len(data) - pattern_length + 1):
         match = True
@@ -132,6 +184,7 @@ def find_pattern_with_wildcards(data, pattern, pattern_name):
         if match:
             print(f"{DEBUG}[DEBUG] Wildcard pattern '{pattern_name}' found at offset: 0x{i:08X}{RESET}")
             return i
+    print(f"{WARN}[WARN] Wildcard pattern '{pattern_name}' not found.{RESET}")
     return -1
 
 def get_section_from_rva(binary, rva, binary_format):
@@ -167,17 +220,17 @@ def read_pointer(binary, rva, binary_format):
         print(f"{ERROR}[ERROR] Exception while reading pointer at RVA 0x{rva:08X}: {e}{RESET}")
         return None
 
-def compute_addresses(binary, pattern_rva, image_base, relative_offsets, binary_format):
+def compute_addresses(binary, pattern_rva, image_base, alignment, relative_offsets, binary_format):
     addresses = {}
     for name, relative_offset in relative_offsets.items():
         print(f"{INFO}[INFO] Computing address for '{name}':{RESET}")
         pointer_rva = pattern_rva + relative_offset
         print(f"{DEBUG}[DEBUG] Pattern RVA: 0x{pattern_rva:08X} + Offset: 0x{relative_offset:X} = Pointer RVA: 0x{pointer_rva:08X}")
-
+        
         if name in FUNCTION_NAMES:
             adjusted_address = pattern_rva + relative_offset
             addresses[name] = adjusted_address
-            print(f"{INFO}[INFO]Computed Address for '{name}': 0x{adjusted_address:08X}{RESET}")
+            print(f"{INFO}[INFO] Computed Address for '{name}': 0x{adjusted_address:08X}{RESET}")
         else:
             raw_value = read_pointer(binary, pointer_rva, binary_format)
             if raw_value is None:
@@ -185,7 +238,7 @@ def compute_addresses(binary, pattern_rva, image_base, relative_offsets, binary_
                 print(f"{WARN}[WARN] Could not read pointer for '{name}'.{RESET}")
             else:
                 adjusted_address = raw_value - image_base
-                print(f"{INFO}[INFO]Adjusted Address for '{name}': 0x{adjusted_address:08X}{RESET}")
+                print(f"{INFO}[INFO] Adjusted Address for '{name}': 0x{adjusted_address:08X}{RESET}")
                 addresses[name] = adjusted_address
 
     return addresses
@@ -200,6 +253,9 @@ def calculate_prologue_length(binary, function_rva, min_bytes=5):
     text_va = text_section.virtual_address
 
     offset = function_rva - text_va
+    print(f"{offset:08X}")
+    print(f"{function_rva:08X}")
+    print(f"{text_va:08X}")
     if offset < 0 or offset >= len(text_data):
         print(f"{WARN}[WARN] Function RVA 0x{function_rva:08X} is out of .text section bounds.{RESET}")
         return None
@@ -214,11 +270,11 @@ def calculate_prologue_length(binary, function_rva, min_bytes=5):
 
     return total_length
 
-def calculate_prologue_lengths(binary, offsets, load_address):
+def calculate_prologue_lengths(binary, offsets, alignment):
     prologue_lengths = {}
     for func in ["exec_proc", "server_tick", "send_maps"]:
         if func in offsets and offsets[func] is not None:
-            prologue_length = calculate_prologue_length(binary, offsets[func] + load_address)
+            prologue_length = calculate_prologue_length(binary, offsets[func])
             if prologue_length:
                 prologue_lengths[func] = prologue_length
                 print(f"{INFO}[INFO] Prologue length for {func}: {prologue_length} bytes{RESET}")
@@ -241,29 +297,34 @@ def generate_combined_prologue_value(prologue_lengths):
         print(f"{ERROR}[ERROR] Failed to generate combined prologue value: {e}{RESET}")
         return None
 
-def extract_procdef(data: bytes, base_address: int, procdef_pattern: ComplexOffsetPattern, binary_format: str):
-    pattern_offset = find_pattern_with_wildcards(data, procdef_pattern.pattern, procdef_pattern.name)
+def extract_procdef(data: bytes, base_address: int, procdef_info: dict, binary_format: str) -> Optional[str]:
+    """
+    Extracts the procdef complex offset based on the procdef pattern.
+    """
+    pattern = procdef_info["pattern"]
+    wildcard_positions = procdef_info.get("wildcard_positions", [])
+    
+    pattern_offset = find_pattern_with_wildcards(data, pattern, "procdef")
     if pattern_offset == -1:
-        print(f"{WARN}[WARN] {procdef_pattern.name} pattern not found.{RESET}")
+        print(f"{WARN}[WARN] procdef pattern not found.{RESET}")
         return None
 
     pattern_rva = base_address + pattern_offset
-    print(f"{INFO}[INFO] {procdef_pattern.name} Pattern RVA: 0x{pattern_rva:08X}{RESET}")
+    print(f"{INFO}[INFO] procdef Pattern RVA: 0x{pattern_rva:08X}{RESET}")
 
-    if procdef_pattern.second_wildcard_pos >= len(procdef_pattern.pattern):
-        print(f"{ERROR}[ERROR] Second wildcard position {procdef_pattern.second_wildcard_pos} exceeds pattern length.{RESET}")
+    # Extract bytes at the specified wildcard positions
+    try:
+        if len(wildcard_positions) < 2:
+            print(f"{ERROR}[ERROR] Not enough wildcard positions defined for procdef.{RESET}")
+            return None
+        byte1 = data[pattern_offset + wildcard_positions[0]]
+        byte2 = data[pattern_offset + wildcard_positions[1]]
+        complex_offset = f"0x00{byte1:02X}00{byte2:02X}"
+        print(f"{INFO}[INFO] Extracted procdef: {complex_offset}{RESET}")
+        return complex_offset
+    except IndexError:
+        print(f"{ERROR}[ERROR] procdef extraction failed due to index out of range.{RESET}")
         return None
-
-    if pattern_offset + procdef_pattern.second_wildcard_pos >= len(data):
-        print(f"{ERROR}[ERROR] Second wildcard position out of bounds for {procdef_pattern.name}.{RESET}")
-        return None
-
-    byte1 = data[pattern_offset + procdef_pattern.first_wildcard_pos]
-    byte2 = data[pattern_offset + procdef_pattern.second_wildcard_pos]
-    complex_offset = f"0x00{byte1:02X}00{byte2:02X}"
-    print(f"{INFO}[INFO] Extracted {procdef_pattern.name}: {complex_offset}{RESET}")
-
-    return complex_offset
 
 def get_image_base(binary: lief.Binary, binary_format: str) -> int:
     """
@@ -289,28 +350,88 @@ def get_image_base(binary: lief.Binary, binary_format: str) -> int:
         print(f"{ERROR}[ERROR] Unsupported binary format: {binary_format}.{RESET}")
         sys.exit(1)
 
-def get_load_address(binary: lief.Binary, binary_format: str) -> int:
+def get_alignment(binary: lief.Binary, binary_format: str) -> int:
     """
-    Retrieve the load address for the binary.
-    - For ELF, this is the virtual address of the first executable PT_LOAD segment.
-    - For PE, return 0 since the load address is effectively the image base.
-    """
+    Retrieve the p_align for the ELF binary.
+   """
     if binary_format == 'PE':
-        return 0  # No separate load address for PE binaries
+        return 0
     elif binary_format == 'ELF':
         exec_segments = [
             seg for seg in binary.segments
-            if seg.type == lief.ELF.Segment.TYPE.LOAD and lief.ELF.Segment.FLAGS.X in seg.flags
+            if seg.type == lief.ELF.Segment.TYPE.LOAD and seg.has(lief.ELF.Segment.FLAGS.X)
         ]
         if not exec_segments:
             print(f"{ERROR}[ERROR] No executable PT_LOAD segments found in ELF binary.{RESET}")
             return 0
         load_address = exec_segments[0].virtual_address
-        print(f"{INFO}[INFO] Load Address (ELF): 0x{load_address:08X}{RESET}")
-        return load_address
+        alignment = exec_segments[0].alignment
+        print(f"{INFO}[INFO] executable PT_LOAD segment address: 0x{load_address:08X}{RESET}")
+        print(f"{INFO}[INFO] executable PT_LOAD segment alignment: 0x{alignment:08X}{RESET}")
+        return alignment
     else:
         print(f"{ERROR}[ERROR] Unsupported binary format: {binary_format}.{RESET}")
         return 0
+
+def find_array_pointer(data: bytes, array_name: str, array_len_ptr: int, image_base: int, alignment: int, binary_format: str) -> Optional[int]:
+    """
+    Finds the array pointer using the complex pattern defined in PATTERNS_AND_OFFSETS.
+    """
+    # Retrieve the specific array pattern and pointer_offset
+    binary_info = PATTERNS_AND_OFFSETS.get(binary_format)
+    if not binary_info:
+        print(f"{ERROR}[ERROR] No patterns defined for binary format: {binary_format}.{RESET}")
+        return None
+    
+    array_info = binary_info["array_patterns"].get(array_name)
+    if not array_info:
+        print(f"{WARN}[WARN] No pattern defined for array '{array_name}' in binary format '{binary_format}'.{RESET}")
+        return None
+    
+    pattern = array_info["pattern"]
+    pointer_offset = array_info["pointer_offset"]
+    
+    array_len_val = array_len_ptr + image_base
+
+    try:
+        array_len_bytes = array_len_val.to_bytes(4, byteorder='little')
+    except OverflowError:
+        print(f"{WARN}[WARN] array_len_val 0x{array_len_val:08X} exceeds 4 bytes for '{array_name}'.{RESET}")
+        return None
+
+    # Insert the array_len_val into the pattern
+    pattern_with_len = pattern.copy()
+    len_inserted = 0
+    for i in range(len(pattern_with_len)):
+        if pattern_with_len[i] is None and len_inserted < 4:
+            pattern_with_len[i] = array_len_bytes[len_inserted]
+            len_inserted += 1
+        if len_inserted == 4:
+            break
+
+    if len_inserted < 4:
+        print(f"{WARN}[WARN] Failed to insert array_len_val into pattern for '{array_name}'.{RESET}")
+        return None
+
+    print(f"{DEBUG}[DEBUG] Constructed pattern for '{array_name}': {' '.join(['??' if b is None else f'{b:02X}' for b in pattern_with_len])}{RESET}")
+
+    pattern_name = f"{array_name}_pattern"
+
+    # Perform pattern matching with wildcards
+    pattern_offset = find_pattern_with_wildcards(data, pattern_with_len, pattern_name)
+    if pattern_offset != -1:
+        # Extract the array pointer using the pointer_offset
+        array_ptr_bytes = data[pattern_offset + pointer_offset : pattern_offset + pointer_offset + POINTER_BYTE_LENGTH]
+        if len(array_ptr_bytes) < POINTER_BYTE_LENGTH:
+            print(f"{WARN}[WARN] Not enough bytes to extract array pointer for '{array_name}'.{RESET}")
+            return None
+        array_ptr = int.from_bytes(array_ptr_bytes, byteorder='little')
+        array_ptr-= image_base
+        print(f"{DEBUG}[DEBUG] Array pointer for '{array_name}' found at offset 0x{pattern_offset:08X}: 0x{array_ptr:08X}{RESET}")
+        return array_ptr
+    else:
+        print(f"{WARN}[WARN] Array pointer for '{array_name}' not found via pattern matching.{RESET}")
+        return None
 
 def main():
     args = sys.argv[1:]
@@ -352,9 +473,9 @@ def main():
     else:
         print(f"{INFO}[INFO] Successfully loaded binary: {binary_path}{RESET}")
 
-    # Get our load address, 0 if PE, ELF can vary
-    load_address = get_load_address(binary, binary_format)
-    image_base = get_image_base(binary, binary_format) + load_address
+    # setup image_base/alignment
+    alignment = get_alignment(binary, binary_format)
+    image_base = get_image_base(binary, binary_format)
     
     text_section = binary.get_section(".text")
     if not text_section:
@@ -369,44 +490,65 @@ def main():
 
     # Determine format-specific patterns and offsets
     if binary_format == "PE":
-        patterns_and_offsets = FUNC_PATTERNS_AND_OFFSETS["PE"]
-        procdef_pattern = PROCDEF_COMPLEX_OFFSET_PATTERNS["PE"]
-        base_pattern = PE_BASE_PATTERN
-        base_offsets = PE_BASE_OFFSETS
-    elif use_old_elf:
-        patterns_and_offsets = FUNC_PATTERNS_AND_OFFSETS["OLD_ELF"]
-        procdef_pattern = PROCDEF_COMPLEX_OFFSET_PATTERNS["ELF_old"]
-        base_pattern = OLD_ELF_BASE_PATTERN
-        base_offsets = OLD_ELF_BASE_OFFSETS
-    else:  # NEW_ELF
-        patterns_and_offsets = FUNC_PATTERNS_AND_OFFSETS["NEW_ELF"]
-        procdef_pattern = PROCDEF_COMPLEX_OFFSET_PATTERNS["ELF_new"]
-        base_pattern = NEW_ELF_BASE_PATTERN
-        base_offsets = NEW_ELF_BASE_OFFSETS
+        base_info = PATTERNS_AND_OFFSETS["PE"]
+    elif binary_format == "ELF" and use_old_elf:
+        base_info = PATTERNS_AND_OFFSETS["OLD_ELF"]
+        binary_format = "OLD_ELF"
+    elif binary_format == "ELF" and not use_old_elf:
+        base_info = PATTERNS_AND_OFFSETS["NEW_ELF"]
+        binary_format = "NEW_ELF"
+    else:
+        print(f"{ERROR}[ERROR] Unsupported binary format configuration.{RESET}")
+        sys.exit(1)
 
     all_extracted_addresses = {}
 
-    # Extract base offsets
+    # Search for the anchor pattern
+    print(f"{INFO}[INFO] Searching for Memory Diagnostics Anchor Pattern...{RESET}")
+    base_pattern = base_info["anchor_pattern"]
     base_pattern_offset = find_pattern(text_data, base_pattern)
     if base_pattern_offset != -1:
-        base_rva = text_va + base_pattern_offset # add text_va as we searched the content of .text which is slightly offset from image_base
-        print(f"{INFO}[INFO] Base pattern found at RVA: 0x{base_rva:08X}{RESET}")
-        extracted_base = compute_addresses(binary, base_rva, image_base, base_offsets, binary_format)
-        all_extracted_addresses.update({k: v for k, v in extracted_base.items() if v is not None})
+        base_rva = text_va + base_pattern_offset
+        print(f"{INFO}[INFO] Memory Diagnostics Anchor found at RVA: 0x{base_rva:08X}{RESET}")
+        # Compute addresses based on the new offsets (only lengths)
+        extracted_lengths = compute_addresses(binary, base_rva, image_base, alignment, base_info["offsets"], binary_format)
+        all_extracted_addresses.update({k: v for k, v in extracted_lengths.items() if v is not None})
     else:
-        print(f"{WARN}[WARN] Base pattern not found.{RESET}")
+        print(f"{WARN}[WARN] Memory Diagnostics Anchor pattern not found.{RESET}")
+
+    # Extract lengths and array pointers if Memory Diagnostics Anchor was found
+    if base_pattern_offset != -1:
+        # Read lengths
+        strings_len = all_extracted_addresses.get("strings_len", None)
+        procdefs_len = all_extracted_addresses.get("procdefs_len", None)
+        miscs_len = all_extracted_addresses.get("miscs_len", None)
+
+        # Dynamic Pattern Matching for Array Pointers
+        for array_name in ["strings", "procdefs", "miscs"]:
+            array_len_ptr = all_extracted_addresses.get(f"{array_name}_len", None)
+            if array_len_ptr is not None:
+                array_ptr = find_array_pointer(text_data, array_name, array_len_ptr, image_base, alignment, binary_format)
+                if array_ptr is not None:
+                    all_extracted_addresses[array_name] = array_ptr
+            else:
+                print(f"{WARN}[WARN] Length pointer for '{array_name}' not available.{RESET}")
 
     # Extract procdef
-    procdef_offset = extract_procdef(text_data, text_va, procdef_pattern, binary_format)
+    procdef_info = {
+        "pattern": base_info["procdef_pattern"]["pattern"],
+        "wildcard_positions": base_info["procdef_pattern"]["wildcard_positions"]
+    }
+    procdef_offset = extract_procdef(text_data, text_va, procdef_info, binary_format)
     if procdef_offset:
         all_extracted_addresses["procdef"] = procdef_offset
 
     # Extract function RVAs
+    func_patterns = FUNC_PATTERNS_AND_OFFSETS.get(binary_format, {})
     offsets = {}
-    for func, data in patterns_and_offsets.items():
+    for func, data in func_patterns.items():
         pattern_offset = find_pattern(text_data, data["pattern"])
         if pattern_offset != -1:
-            final_rva = text_va + pattern_offset + data["offset"] - load_address
+            final_rva = text_va + pattern_offset + data["offset"]
             offsets[func] = final_rva
             print(f"{INFO}[INFO] {func} RVA: 0x{final_rva:08X}{RESET}")
         else:
@@ -414,7 +556,7 @@ def main():
             offsets[func] = None
 
     # Calculate prologue lengths
-    prologue_lengths = calculate_prologue_lengths(binary, offsets, load_address)
+    prologue_lengths = calculate_prologue_lengths(binary, offsets, alignment)
 
     # Generate combined prologue value
     combined_prologue_value = generate_combined_prologue_value(prologue_lengths)
@@ -428,9 +570,11 @@ def main():
     print(f"\n{RESULTS}Extracted Addresses:{RESET}")
     final_order = [
         "strings", 
-        "strings_len", 
-        "miscs", 
+        "strings_len",
+        "miscs",
+        "miscs_len",
         "procdefs",
+        "procdefs_len",
         "procdef",
         "exec_proc", 
         "server_tick", 
@@ -442,7 +586,7 @@ def main():
     values_list = []
     for name in final_order:
         addr = all_extracted_addresses.get(name, None)
-        if name == "procdef" or name == "prologue":
+        if name in ["procdef", "prologue"]:
             # procdef and prologue are hex strings
             if addr is not None:
                 print(f"  {RESULTS}{name}: {addr}{RESET}")
@@ -461,7 +605,6 @@ def main():
 
     # Print second time in a single line separated by commas
     print(f"\n{RESULTS}{{{', '.join(values_list)}}}{RESET}")
-
 
 if __name__ == "__main__":
     main()
