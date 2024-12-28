@@ -26,9 +26,9 @@ PATTERNS_AND_OFFSETS = {
     "PE": {
         "anchor_pattern": bytes.fromhex("8a 01 41 84 c0 75 f9 2b ca 89 4e 18 8b 55 f0"),
         "offsets": {
-            "strings_len": 0x19,     # Example offset for strings_len
-            "procdefs_len": -0x96,  # Example offset for procdefs_len
-            "miscs_len": 0x16F,     # Example offset for miscs_len
+            "strings_len": 0x19,
+            "procdefs_len": -0x96,
+            "miscs_len": 0x16F,
         },
         "array_patterns": {
             "strings": {
@@ -36,7 +36,7 @@ PATTERNS_AND_OFFSETS = {
                     0x8b, 0x4d, 0x08, 0x3b, 0x0d, None, None, None, None, 0x73, 
                     0x10, 0xa1, None, None, None, None, 0x8b, None, 0x88
                 ],
-                "pointer_offset": 12  # Position to extract the array pointer
+                "pointer_offset": 12
             },
             "procdefs": {
                 "pattern": [
@@ -44,14 +44,14 @@ PATTERNS_AND_OFFSETS = {
                     0x5d, 0xc3, 0x6b, 0xc0, None, 0x03, 0x05, None, None, None,
                     None
                 ],
-                "pointer_offset": 17  # Position to extract the array pointer
+                "pointer_offset": 17
             },
             "miscs": {
                 "pattern": [
                     0x3b, 0x0d, None, None, None, None, 0x72, 0x04, 0x33, 0xc0,
                     0x5d, 0xc3, 0xa1, None, None, None, None, 0x8b, None, 0x88
                 ],
-                "pointer_offset": 13  # Position to extract the array pointer
+                "pointer_offset": 13
             }
         },
         "procdef_pattern": {
@@ -61,7 +61,7 @@ PATTERNS_AND_OFFSETS = {
                 0x8D, 0x0C, 0x85, 0x0C, 0x00, 0x00, 0x00, 0x8B, 0x45, 0xF0, 0x83,
                 0xC0, None
             ],
-            "wildcard_positions": [2, 34]  # Corrected positions for PE
+            "wildcard_positions": [2, 34]
         },
         "functions": {
             "exec_proc": {
@@ -225,7 +225,7 @@ PATTERNS_AND_OFFSETS = {
                 0x8D, 0x14, 0x85, 0x0C, 0x00, 0x00, 0x00, 0x8B, 0x45, 0xC8, 0x8D,
                 0x44, 0x02, None
             ],
-            "wildcard_positions": [2, 35]  # Corrected positions for NEW_ELF
+            "wildcard_positions": [2, 35]
         },
         "functions": {
             "exec_proc": {
@@ -389,7 +389,6 @@ def generate_combined_prologue2_value(prologue2_lengths):
         event_io = prologue2_lengths.get("event_io", 0) or 0
         mkstr = prologue2_lengths.get("mkstr", 0) or 0
         rebalance = prologue2_lengths.get("rebalance", 0) or 0
-        # Adjust the combined value format as needed; example:
         combined_value = f"0x{rebalance:02X}{mkstr:02X}{event_io:02X}{erasure:02X}"
         return combined_value
     except Exception as e:
