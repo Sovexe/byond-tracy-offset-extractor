@@ -26,9 +26,9 @@ PATTERNS_AND_OFFSETS = {
     "PE": {
         "anchor_pattern": bytes.fromhex("8a 01 41 84 c0 75 f9 2b ca 89 4e 18 8b 55 f0"),
         "offsets": {
-            "strings_len": 0x19,     # Example offset for strings_len
-            "procdefs_len": -0x96,  # Example offset for procdefs_len
-            "miscs_len": 0x16F,     # Example offset for miscs_len
+            "strings_len": 0x19,
+            "procdefs_len": -0x96,
+            "miscs_len": 0x16F,
         },
         "array_patterns": {
             "strings": {
@@ -36,7 +36,7 @@ PATTERNS_AND_OFFSETS = {
                     0x8b, 0x4d, 0x08, 0x3b, 0x0d, None, None, None, None, 0x73, 
                     0x10, 0xa1, None, None, None, None, 0x8b, None, 0x88
                 ],
-                "pointer_offset": 12  # Position to extract the array pointer
+                "pointer_offset": 12
             },
             "procdefs": {
                 "pattern": [
@@ -44,14 +44,14 @@ PATTERNS_AND_OFFSETS = {
                     0x5d, 0xc3, 0x6b, 0xc0, None, 0x03, 0x05, None, None, None,
                     None
                 ],
-                "pointer_offset": 17  # Position to extract the array pointer
+                "pointer_offset": 17
             },
             "miscs": {
                 "pattern": [
                     0x3b, 0x0d, None, None, None, None, 0x72, 0x04, 0x33, 0xc0,
                     0x5d, 0xc3, 0xa1, None, None, None, None, 0x8b, None, 0x88
                 ],
-                "pointer_offset": 13  # Position to extract the array pointer
+                "pointer_offset": 13
             }
         },
         "procdef_pattern": {
@@ -61,7 +61,7 @@ PATTERNS_AND_OFFSETS = {
                 0x8D, 0x0C, 0x85, 0x0C, 0x00, 0x00, 0x00, 0x8B, 0x45, 0xF0, 0x83,
                 0xC0, None
             ],
-            "wildcard_positions": [2, 34]  # Corrected positions for PE
+            "wildcard_positions": [2, 34]
         },
         "functions": {
             "exec_proc": {
@@ -89,6 +89,40 @@ PATTERNS_AND_OFFSETS = {
                     0x00
                 ],
             },
+            "erasure": {
+                "pattern": [
+                    0X55, 0x8b, 0xec, 0x6a, 0xff, 0x68, None, None, None, None, 0x64,
+                    0xa1, 0x00, 0x00, 0x00, 0x00, 0x50, 0x83, 0xec, None, 0x53, 0x56,
+                    0x57, 0xa1, None, None, None, None, 0x33, 0xc5, 0x50, 0x8d, 0x45,
+                    0xf4, 0x64, 0xa3, 0x00, 0x00, 0x00, 0x00, 0x89, 0x65, 0xf0, 0x8b,
+                    0x0d, None, None, None, None, 0xb0
+                ],
+            },
+            "event_io":{
+                "pattern": [
+                    0x55, 0x8b, 0xec, 0x83, 0xec, 0x08, 0x83, 0x3d, None, None, None,
+                    None, 0x00, 0x56, 0x8b, 0xf1, 0x89, 0x75, 0xfc, 0x74, 0x14, 0x68,
+                    None, None, None, None, 0xe8, None, None, None, 0xff, 0x83, 0xc4,
+                    0x04, 0x5e, 0x8b, 0xe5, 0x5d, 0xc2, 0x08, 0x00
+                ]
+            },
+            "mkstr":{
+                "pattern": [
+                    0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x83, 0xec, 0x20, 0x53, 0x56,
+                    0x8b, 0x35, None, None, None, None, 0x57, 0x85, 0xc0, 0x75, 0x0e,
+                    0x68, None, None, None, None, 0xff, 0xd6, 0x83, 0xc4, 0x04, 0xc6,
+                    0x45, 0x14, 0x00
+                ]
+            },
+            "rebalance":{
+                "pattern":[
+                    0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, None, None, None, None, 0x64,
+                    0xa1, 0x00, 0x00, 0x00, 0x00, 0x50, 0x83, 0xec, 0x1c, 0x53, 0x56,
+                    0x57, 0xa1, None, None, None, None, 0x33, 0xc5, 0x50, 0x8d, 0x45,
+                    0xf4, 0x64, 0xa3, 0x00, 0x00, 0x00, 0x00, 0xa1, None, None, None,
+                    None, 0xc1, 0xe0, None, 0x50
+                ]
+            }
         }
     },
     "OLD_ELF": {
@@ -152,6 +186,36 @@ PATTERNS_AND_OFFSETS = {
                     0xff, 0xff, 0x89, None, None, None, 0xff
                 ],
             },
+            "erasure": {
+                "pattern": [
+                    0x55, 0x89, 0xe5, 0x57, 0x56, 0x53, 0x81, 0xec, None, 0x00, 0x00,
+                    0x00, 0x8b, 0x45, 0x08, 0x8b, 0x0d, None, None, None, None, 0x8b,
+                    0x55, 0x0c, 0x89, 0x45, 0xa4, 0x88, 0x45, 0xa3, 0xa1, None, None,
+                    None, None, 0x89
+                ]
+            },
+            "event_io": {
+                "pattern": [
+                    0x55, 0xba, None, 0x00, 0x00, 0x00, 0x89, 0xe5, 0x31, 0xc0, 0x57,
+                    0x89, 0xd1, 0x56, 0x53, 0x81, 0xec, None, None, 0x00, 0x00, 0x8b,
+                    0x5d, 0x08, 0xc7, 0x45, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x8d, 0xbd,
+                    0x60, 0xff, 0xff, 0xff, 0xc7, 0x45, 0xe4
+                ]
+            },
+            "mkstr": {
+                "pattern": [
+                    0x55, 0x89, 0xe5, 0x57, 0x56, 0x89, 0xce, 0x53, 0x89, 0xd3, 0x83,
+                    0xec, None, 0x8b, 0x55, 0x08, 0x85, 0xc0, 0x88, 0x55, 0xb4, 0x0f,
+                    0x84, None, None, 0x00, 0x00
+                ]
+            },
+            "rebalance": {
+                "pattern": [
+                    0x55, 0x89, 0xe5, 0x57, 0x56, 0x53, 0x83, 0xec, 0x5c, 0xa1, None,
+                    None, None, None, 0xc1, 0xe0, 0x02, 0x89, 0x04, 0x24, 0xe8, None,
+                    None, None, None, 0x8b, 0x15, None, None, None, None, 0x83, 0xfa,
+                ]
+            },
         }
     },
     "NEW_ELF": {
@@ -191,7 +255,7 @@ PATTERNS_AND_OFFSETS = {
                 0x8D, 0x14, 0x85, 0x0C, 0x00, 0x00, 0x00, 0x8B, 0x45, 0xC8, 0x8D,
                 0x44, 0x02, None
             ],
-            "wildcard_positions": [2, 35]  # Corrected positions for NEW_ELF
+            "wildcard_positions": [2, 35]
         },
         "functions": {
             "exec_proc": {
@@ -214,11 +278,43 @@ PATTERNS_AND_OFFSETS = {
                     0x65, 0xa1, 0x00, 0x00, 0x00, 0x00
                 ],
             },
+            "erasure": {
+                "pattern": [
+                    0x55, 0x89, 0xe5, 0x57, 0x56, 0x53, 0x83, 0xec, 0x5c, 0xa1, None,
+                    None, None, None, 0xf3, 0x0f, 0x7e, 0x45, 0x08, 0x89, 0x45, 0xc0,
+                    0xa1, None, None, None, None, 0x66, 0x0f, 0x6f, 0xc8, 0x66, 0x0f,
+                    0x7e, 0xc6
+                ]
+            },
+            "event_io": {
+                "pattern": [
+                    0x55, 0x31, 0xc0, 0xb9, None, 0x00, 0x00, 0x00, 0x57, 0x56, 0x53,
+                    0x81, 0xec, None, None, 0x00, 0x00, 0x8d, 0x7c, 0x24, None, 0xc7,
+                    0x44, 0x24, 0x18, 0x00, 0x00, 0x00, 0x00, 0xf3, 0xab, 0xb9, None,
+                    0x00, 0x00, 0x00, 0x8d, 0xbc, 0x24, None, 0x00, 0x00, 0x00
+                ]
+            },
+            "mkstr": {
+                "pattern": [
+                    0x55, 0x57, 0x56, 0x89, 0xce, 0x53, 0x89, 0xd3, 0x83, 0xec, None,
+                    0x8b, 0x54, 0x24, 0x60, 0x88, 0x54, 0x24, 0x0c, 0x85, 0xc0, 0x0f,
+                    0x84, None, None, 0x00, 0x00
+                ]
+            },
+            "rebalance": {
+                "pattern": [
+                    0x55, 0x89, 0xe5, 0x57, 0x56, 0x53, 0x83, 0xec, None, 0x8b, 0x3d,
+                    None, None, None, None, 0x8d, None, 0xbd, 0x00, 0x00, 0x00, 0x00,
+                    0x50, 0xe8, None, None, None, None, 0x8b, 0x0d, None, None, None,
+                    None, 0x83, 0xc4
+                ]
+            },
         }
     }
 }
 
-FUNCTION_NAMES = {"exec_proc", "send_maps", "server_tick"}
+PROLOGUE_FUNCTION_NAMES = {"exec_proc", "send_maps", "server_tick"}
+PROLOGUE2_FUNCTION_NAMES = {"erasure", "event_io", "mkstr", "rebalance"}
 POINTER_BYTE_LENGTH = 4
 
 def find_pattern(data: bytes, pattern: bytes) -> int:
@@ -285,19 +381,14 @@ def compute_addresses(binary, pattern_rva, image_base, relative_offsets):
         pointer_rva = pattern_rva + relative_offset
         print(f"{DEBUG}[DEBUG] Pattern RVA: 0x{pattern_rva:08X} + Offset: 0x{relative_offset:X} = Pointer RVA: 0x{pointer_rva:08X}{RESET}")
 
-        if name in FUNCTION_NAMES:
-            adjusted_address = pattern_rva + relative_offset
-            addresses[name] = adjusted_address
-            print(f"{INFO}[INFO] Computed Address for '{name}': 0x{adjusted_address:08X}{RESET}")
+        raw_value = read_pointer(binary, pointer_rva)
+        if raw_value is None:
+            addresses[name] = None
+            print(f"{WARN}[WARN] Could not read pointer for '{name}'.{RESET}")
         else:
-            raw_value = read_pointer(binary, pointer_rva)
-            if raw_value is None:
-                addresses[name] = None
-                print(f"{WARN}[WARN] Could not read pointer for '{name}'.{RESET}")
-            else:
-                adjusted_address = raw_value - image_base
-                print(f"{INFO}[INFO] Adjusted Address for '{name}': 0x{adjusted_address:08X}{RESET}")
-                addresses[name] = adjusted_address
+            adjusted_address = raw_value - image_base
+            print(f"{INFO}[INFO] Adjusted Address for '{name}': 0x{adjusted_address:08X}{RESET}")
+            addresses[name] = adjusted_address
 
     return addresses
 
@@ -326,11 +417,11 @@ def calculate_prologue_length(binary, function_rva, min_bytes=5):
 
     return total_length
 
-def calculate_prologue_lengths(binary, offsets):
+def calculate_prologue_lengths(binary, offsets, function_names, min_bytes=5):
     prologue_lengths = {}
-    for func in FUNCTION_NAMES:
+    for func in function_names:
         if func in offsets and offsets[func] is not None:
-            prologue_length = calculate_prologue_length(binary, offsets[func])
+            prologue_length = calculate_prologue_length(binary, offsets[func], min_bytes)
             if prologue_length:
                 prologue_lengths[func] = prologue_length
                 print(f"{INFO}[INFO] Prologue length for {func}: {prologue_length} bytes{RESET}")
@@ -351,6 +442,18 @@ def generate_combined_prologue_value(prologue_lengths):
         return combined_value
     except Exception as e:
         print(f"{ERROR}[ERROR] Failed to generate combined prologue value: {e}{RESET}")
+        return None
+    
+def generate_combined_prologue2_value(prologue2_lengths):
+    try:
+        erasure = prologue2_lengths.get("erasure", 0) or 0
+        event_io = prologue2_lengths.get("event_io", 0) or 0
+        mkstr = prologue2_lengths.get("mkstr", 0) or 0
+        rebalance = prologue2_lengths.get("rebalance", 0) or 0
+        combined_value = f"0x{rebalance:02X}{mkstr:02X}{event_io:02X}{erasure:02X}"
+        return combined_value
+    except Exception as e:
+        print(f"{ERROR}[ERROR] Failed to generate combined prologue2 value: {e}{RESET}")
         return None
 
 def extract_procdef(data: bytes, base_address: int, procdef_info: dict) -> Optional[str]:
@@ -592,12 +695,17 @@ def main():
             offsets[func] = None
 
     # Calculate prologue lengths
-    prologue_lengths = calculate_prologue_lengths(binary, offsets)
+    prologue_lengths = calculate_prologue_lengths(binary, offsets, PROLOGUE_FUNCTION_NAMES)
+    prologue2_lengths = calculate_prologue_lengths(binary, offsets, PROLOGUE2_FUNCTION_NAMES)
 
     # Generate combined prologue value
     combined_prologue_value = generate_combined_prologue_value(prologue_lengths)
     if combined_prologue_value:
         all_extracted_addresses["prologue"] = combined_prologue_value
+
+    combined_prologue2_value = generate_combined_prologue2_value(prologue2_lengths)
+    if combined_prologue2_value:
+        all_extracted_addresses["prologue2"] = combined_prologue2_value
 
     # Merge function offsets into all_extracted_addresses
     all_extracted_addresses.update({k: v for k, v in offsets.items() if v is not None})
@@ -639,6 +747,38 @@ def main():
                 print(f"  {WARN}{name}: Not found{RESET}")
                 values_list.append("None")
 
+    # Print second time in a single line separated by commas
+    print(f"\n{RESULTS}{{{', '.join(values_list)}}}{RESET}")
+
+    # Print experimental address results
+    final_order_experimental = [
+        "erasure",
+        "event_io",
+        "mkstr",
+        "rebalance",
+        "prologue2"
+    ]
+
+    print(f"\n{RESULTS}Experimental Addresses:{RESET}")
+    for name in final_order_experimental:
+        addr = all_extracted_addresses.get(name, None)
+        if name in ["prologue2"]:
+            # procdef and prologue are hex strings
+            if addr is not None:
+                print(f"  {RESULTS}{name}: {addr}{RESET}")
+                values_list.append(addr)
+            else:
+                print(f"  {WARN}{name}: Not found{RESET}")
+                values_list.append("None")
+        else:
+            if addr is not None:
+                val_str = f"0x{addr:08X}"
+                print(f"  {RESULTS}{name}: {val_str}{RESET}")
+                values_list.append(val_str)
+            else:
+                print(f"  {WARN}{name}: Not found{RESET}")
+                values_list.append("None")
+            
     # Print second time in a single line separated by commas
     print(f"\n{RESULTS}{{{', '.join(values_list)}}}{RESET}")
 
