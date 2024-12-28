@@ -89,6 +89,40 @@ PATTERNS_AND_OFFSETS = {
                     0x00
                 ],
             },
+            "erasure": {
+                "pattern": [
+                    0X55, 0x8b, 0xec, 0x6a, 0xff, 0x68, None, None, None, None, 0x64,
+                    0xa1, 0x00, 0x00, 0x00, 0x00, 0x50, 0x83, 0xec, None, 0x53, 0x56,
+                    0x57, 0xa1, None, None, None, None, 0x33, 0xc5, 0x50, 0x8d, 0x45,
+                    0xf4, 0x64, 0xa3, 0x00, 0x00, 0x00, 0x00, 0x89, 0x65, 0xf0, 0x8b,
+                    0x0d, None, None, None, None, 0xb0
+                ],
+            },
+            "event_io":{
+                "pattern": [
+                    0x55, 0x8b, 0xec, 0x83, 0xec, 0x08, 0x83, 0x3d, None, None, None,
+                    None, 0x00, 0x56, 0x8b, 0xf1, 0x89, 0x75, 0xfc, 0x74, 0x14, 0x68,
+                    None, None, None, None, 0xe8, None, None, None, 0xff, 0x83, 0xc4,
+                    0x04, 0x5e, 0x8b, 0xe5, 0x5d, 0xc2, 0x08, 0x00
+                ]
+            },
+            "mkstr":{
+                "pattern": [
+                    0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x83, 0xec, 0x20, 0x53, 0x56,
+                    0x8b, 0x35, None, None, None, None, 0x57, 0x85, 0xc0, 0x75, 0x0e,
+                    0x68, None, None, None, None, 0xff, 0xd6, 0x83, 0xc4, 0x04, 0xc6,
+                    0x45, 0x14, 0x00
+                ]
+            },
+            "rebalance":{
+                "pattern":[
+                    0x55, 0x8b, 0xec, 0x6a, 0xff, 0x68, None, None, None, None, 0x64,
+                    0xa1, 0x00, 0x00, 0x00, 0x00, 0x50, 0x83, 0xec, 0x1c, 0x53, 0x56,
+                    0x57, 0xa1, None, None, None, None, 0x33, 0xc5, 0x50, 0x8d, 0x45,
+                    0xf4, 0x64, 0xa3, 0x00, 0x00, 0x00, 0x00, 0xa1, None, None, None,
+                    None, 0xc1, 0xe0, None, 0x50
+                ]
+            }
         }
     },
     "OLD_ELF": {
@@ -218,7 +252,8 @@ PATTERNS_AND_OFFSETS = {
     }
 }
 
-FUNCTION_NAMES = {"exec_proc", "send_maps", "server_tick"}
+PROLOGUE_FUNCTION_NAMES = {"exec_proc", "send_maps", "server_tick"}
+PROLOGUE2_FUNCTION_NAMES = {"erasure", "event_io", "mkstr", "rebalance"}
 POINTER_BYTE_LENGTH = 4
 
 def find_pattern(data: bytes, pattern: bytes) -> int:
@@ -285,19 +320,14 @@ def compute_addresses(binary, pattern_rva, image_base, relative_offsets):
         pointer_rva = pattern_rva + relative_offset
         print(f"{DEBUG}[DEBUG] Pattern RVA: 0x{pattern_rva:08X} + Offset: 0x{relative_offset:X} = Pointer RVA: 0x{pointer_rva:08X}{RESET}")
 
-        if name in FUNCTION_NAMES:
-            adjusted_address = pattern_rva + relative_offset
-            addresses[name] = adjusted_address
-            print(f"{INFO}[INFO] Computed Address for '{name}': 0x{adjusted_address:08X}{RESET}")
+        raw_value = read_pointer(binary, pointer_rva)
+        if raw_value is None:
+            addresses[name] = None
+            print(f"{WARN}[WARN] Could not read pointer for '{name}'.{RESET}")
         else:
-            raw_value = read_pointer(binary, pointer_rva)
-            if raw_value is None:
-                addresses[name] = None
-                print(f"{WARN}[WARN] Could not read pointer for '{name}'.{RESET}")
-            else:
-                adjusted_address = raw_value - image_base
-                print(f"{INFO}[INFO] Adjusted Address for '{name}': 0x{adjusted_address:08X}{RESET}")
-                addresses[name] = adjusted_address
+            adjusted_address = raw_value - image_base
+            print(f"{INFO}[INFO] Adjusted Address for '{name}': 0x{adjusted_address:08X}{RESET}")
+            addresses[name] = adjusted_address
 
     return addresses
 
@@ -326,11 +356,11 @@ def calculate_prologue_length(binary, function_rva, min_bytes=5):
 
     return total_length
 
-def calculate_prologue_lengths(binary, offsets):
+def calculate_prologue_lengths(binary, offsets, function_names, min_bytes=5):
     prologue_lengths = {}
-    for func in FUNCTION_NAMES:
+    for func in function_names:
         if func in offsets and offsets[func] is not None:
-            prologue_length = calculate_prologue_length(binary, offsets[func])
+            prologue_length = calculate_prologue_length(binary, offsets[func], min_bytes)
             if prologue_length:
                 prologue_lengths[func] = prologue_length
                 print(f"{INFO}[INFO] Prologue length for {func}: {prologue_length} bytes{RESET}")
@@ -351,6 +381,19 @@ def generate_combined_prologue_value(prologue_lengths):
         return combined_value
     except Exception as e:
         print(f"{ERROR}[ERROR] Failed to generate combined prologue value: {e}{RESET}")
+        return None
+    
+def generate_combined_prologue2_value(prologue2_lengths):
+    try:
+        erasure = prologue2_lengths.get("erasure", 0) or 0
+        event_io = prologue2_lengths.get("event_io", 0) or 0
+        mkstr = prologue2_lengths.get("mkstr", 0) or 0
+        rebalance = prologue2_lengths.get("rebalance", 0) or 0
+        # Adjust the combined value format as needed; example:
+        combined_value = f"0x{rebalance:02X}{mkstr:02X}{event_io:02X}{erasure:02X}"
+        return combined_value
+    except Exception as e:
+        print(f"{ERROR}[ERROR] Failed to generate combined prologue2 value: {e}{RESET}")
         return None
 
 def extract_procdef(data: bytes, base_address: int, procdef_info: dict) -> Optional[str]:
@@ -592,12 +635,17 @@ def main():
             offsets[func] = None
 
     # Calculate prologue lengths
-    prologue_lengths = calculate_prologue_lengths(binary, offsets)
+    prologue_lengths = calculate_prologue_lengths(binary, offsets, PROLOGUE_FUNCTION_NAMES)
+    prologue2_lengths = calculate_prologue_lengths(binary, offsets, PROLOGUE2_FUNCTION_NAMES)
 
     # Generate combined prologue value
     combined_prologue_value = generate_combined_prologue_value(prologue_lengths)
     if combined_prologue_value:
         all_extracted_addresses["prologue"] = combined_prologue_value
+
+    combined_prologue2_value = generate_combined_prologue2_value(prologue2_lengths)
+    if combined_prologue2_value:
+        all_extracted_addresses["prologue2"] = combined_prologue2_value
 
     # Merge function offsets into all_extracted_addresses
     all_extracted_addresses.update({k: v for k, v in offsets.items() if v is not None})
@@ -639,6 +687,38 @@ def main():
                 print(f"  {WARN}{name}: Not found{RESET}")
                 values_list.append("None")
 
+    # Print second time in a single line separated by commas
+    print(f"\n{RESULTS}{{{', '.join(values_list)}}}{RESET}")
+
+    # Print experimental address results
+    final_order_experimental = [
+        "erasure",
+        "event_io",
+        "mkstr",
+        "rebalance",
+        "prologue2"
+    ]
+
+    print(f"\n{RESULTS}Experimental Addresses:{RESET}")
+    for name in final_order_experimental:
+        addr = all_extracted_addresses.get(name, None)
+        if name in ["prologue2"]:
+            # procdef and prologue are hex strings
+            if addr is not None:
+                print(f"  {RESULTS}{name}: {addr}{RESET}")
+                values_list.append(addr)
+            else:
+                print(f"  {WARN}{name}: Not found{RESET}")
+                values_list.append("None")
+        else:
+            if addr is not None:
+                val_str = f"0x{addr:08X}"
+                print(f"  {RESULTS}{name}: {val_str}{RESET}")
+                values_list.append(val_str)
+            else:
+                print(f"  {WARN}{name}: Not found{RESET}")
+                values_list.append("None")
+            
     # Print second time in a single line separated by commas
     print(f"\n{RESULTS}{{{', '.join(values_list)}}}{RESET}")
 
