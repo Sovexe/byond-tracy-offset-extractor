@@ -504,7 +504,7 @@ def get_image_base(binary: lief.Binary, binary_format: str) -> int:
             sys.exit(1)
         # Calculate the minimum virtual address of all PT_LOAD segments
         image_base = min(seg.virtual_address for seg in load_segments)
-        print(f"{INFO}[INFO] Calculated Image Base (ELF): 0x{image_base:08X}{RESET}")
+        print(f"{INFO}[INFO] Image Base (ELF): 0x{image_base:08X}{RESET}")
         return image_base
     else:
         print(f"{ERROR}[ERROR] Unsupported binary format: {binary_format}.{RESET}")
@@ -624,14 +624,15 @@ def main():
     text_section = binary.get_section(".text")
     if not text_section:
         print(f"{ERROR}[ERROR] .text section not found.{RESET}")
-        sys.exit(1)
-    else:
-        print(f"{INFO}[INFO] .text section found.{RESET}")
+        sys.exit(1)       
 
     text_data = bytes(text_section.content)
     text_va = text_section.virtual_address
-    print(f"{DEBUG}[DEBUG] .text section VA: 0x{text_va:08X}, Size: {len(text_data)} bytes{RESET}")
-
+    print(
+        f"{INFO}[INFO] .text section found at RVA 0x{text_section.virtual_address:08X} "
+        f"(VA 0x{text_section.virtual_address + image_base:08X}), "
+        f"Size: {len(text_section.content)} bytes{RESET}"
+    )
     # Determine format-specific patterns and offsets
     if binary_format == "PE":
         base_info = PATTERNS_AND_OFFSETS["PE"]
@@ -649,7 +650,7 @@ def main():
     all_extracted_addresses = {}
 
     # Search for the anchor pattern
-    print(f"{INFO}[INFO] Searching for Memory Diagnostics Anchor Pattern...{RESET}")
+    print(f"{DEBUG}[DEBUG] Searching for Memory Diagnostics Anchor Pattern...{RESET}")
     base_pattern = base_info["anchor_pattern"]
     base_pattern_offset = find_pattern(text_data, base_pattern)
     if base_pattern_offset != -1:
