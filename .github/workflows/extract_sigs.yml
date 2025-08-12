@@ -50,9 +50,9 @@ jobs:
       run: |
         MAJOR_VERSION=$(echo "$BYOND_VERSION" | cut -d'.' -f1)
         if [ "${{ matrix.os }}" == "windows" ]; then
-            DOWNLOAD_URL="https://www.byond.com/download/build/${MAJOR_VERSION}/${BYOND_VERSION}_byond.zip"
+            DOWNLOAD_URL="https://spacestation13.github.io/byond-builds/${MAJOR_VERSION}/${BYOND_VERSION}_byond.zip"
           else
-            DOWNLOAD_URL="https://www.byond.com/download/build/${MAJOR_VERSION}/${BYOND_VERSION}_byond_linux.zip"
+            DOWNLOAD_URL="https://spacestation13.github.io/byond-builds/${MAJOR_VERSION}/${BYOND_VERSION}_byond_linux.zip"
         fi
         wget $DOWNLOAD_URL -O byond.zip
         unzip byond.zip
