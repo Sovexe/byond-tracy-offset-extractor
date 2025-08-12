@@ -324,7 +324,7 @@ def find_pattern(data: bytes, pattern: bytes) -> int:
         return -1
     index = data.find(pattern)
     if index != -1:
-        print(f"{DEBUG}[DEBUG] Pattern found at offset: 0x{index:08X}{RESET}")
+        print(f"{DEBUG}[DEBUG] Pattern found at .text+0x{index:08X}{RESET}")
     else:
         print(f"{WARN}[WARN] Pattern not found for a given pattern.{RESET}")
     return index
@@ -338,7 +338,7 @@ def find_pattern_with_wildcards(data: bytes, pattern: List[Optional[int]], patte
                 match = False
                 break
         if match:
-            print(f"{DEBUG}[DEBUG] Wildcard pattern '{pattern_name}' found at offset: 0x{i:08X}{RESET}")
+            print(f"{DEBUG}[DEBUG] Wildcard pattern '{pattern_name}' found at .text+0x{i:08X}{RESET}")
             return i
     print(f"{WARN}[WARN] Wildcard pattern '{pattern_name}' not found.{RESET}")
     return -1
@@ -370,7 +370,7 @@ def read_pointer(binary, rva):
             print(f"{WARN}[WARN] Not enough data to read at RVA 0x{rva:08X}.{RESET}")
             return None
         raw_value = int.from_bytes(bytes(data), byteorder="little")
-        print(f"{DEBUG}[DEBUG] Read raw value: 0x{raw_value:08X} from RVA: 0x{rva:08X}{RESET}")
+        print(f"{DEBUG}[DEBUG] Read raw VA: 0x{raw_value:08X} from RVA: 0x{rva:08X}{RESET}")
         return raw_value
     except Exception as e:
         print(f"{ERROR}[ERROR] Exception while reading pointer at RVA 0x{rva:08X}: {e}{RESET}")
@@ -379,7 +379,6 @@ def read_pointer(binary, rva):
 def compute_addresses(binary, pattern_rva, image_base, relative_offsets):
     addresses = {}
     for name, relative_offset in relative_offsets.items():
-        print(f"{INFO}[INFO] Computing address for '{name}':{RESET}")
         pointer_rva = pattern_rva + relative_offset
         print(f"{DEBUG}[DEBUG] Pattern RVA: 0x{pattern_rva:08X} + Offset: 0x{relative_offset:X} = Pointer RVA: 0x{pointer_rva:08X}{RESET}")
 
@@ -389,7 +388,7 @@ def compute_addresses(binary, pattern_rva, image_base, relative_offsets):
             print(f"{WARN}[WARN] Could not read pointer for '{name}'.{RESET}")
         else:
             adjusted_address = raw_value - image_base
-            print(f"{INFO}[INFO] Adjusted Address for '{name}': 0x{adjusted_address:08X}{RESET}")
+            print(f"{INFO}[INFO] Resolved {name} RVA: 0x{adjusted_address:08X}{RESET}")
             addresses[name] = adjusted_address
 
     return addresses
@@ -563,13 +562,21 @@ def find_array_pointer(data: bytes, array_name: str, array_len_ptr: int, image_b
         if len(array_ptr_bytes) < POINTER_BYTE_LENGTH:
             print(f"{WARN}[WARN] Not enough bytes to extract array pointer for '{array_name}'.{RESET}")
             return None
-        array_ptr = int.from_bytes(array_ptr_bytes, byteorder='little')
-        array_ptr -= image_base
-        print(f"{DEBUG}[DEBUG] Array pointer for '{array_name}' found at offset 0x{pattern_offset:08X}: 0x{array_ptr:08X}{RESET}")
+
+        raw_ptr = int.from_bytes(array_ptr_bytes, byteorder='little')
+        print(f"{DEBUG}[DEBUG] Read raw VA for '{array_name}': 0x{raw_ptr:08X} from .text+0x{pattern_offset + pointer_offset:08X}{RESET}")
+
+        array_ptr = raw_ptr - image_base
+        print(f"{INFO}[INFO] Resolved {array_name} RVA: 0x{array_ptr:08X}{RESET}")
         return array_ptr
-    else:
-        print(f"{WARN}[WARN] Array pointer for '{array_name}' not found via pattern matching.{RESET}")
-        return None
+
+# log format helepr    
+def section_divider(title: str, total_width: int = 80):
+    # Ensure at least one space between dashes and title
+    dash_count = max(0, total_width - len(title) - 2)
+    left = dash_count // 2
+    right = dash_count - left
+    print(f"\n{'-' * left} {title} {'-' * right}")
 
 def main():
     args = sys.argv[1:]
@@ -648,6 +655,10 @@ def main():
     if base_pattern_offset != -1:
         base_rva = text_va + base_pattern_offset
         print(f"{INFO}[INFO] Memory Diagnostics Anchor found at RVA: 0x{base_rva:08X}{RESET}")
+
+        # --- Section: Resolving Array Length Variables ---
+        section_divider("Resolving Array Length Variables")
+
         # Compute addresses based on the new offsets (only lengths)
         extracted_lengths = compute_addresses(binary, base_rva, image_base, base_info["offsets"])
         all_extracted_addresses.update({k: v for k, v in extracted_lengths.items() if v is not None})
@@ -661,6 +672,9 @@ def main():
         procdefs_len = all_extracted_addresses.get("procdefs_len", None)
         miscs_len = all_extracted_addresses.get("miscs_len", None)
 
+        # --- Section: Resolving Arrays ---
+        section_divider("Resolving Arrays")
+
         # Dynamic Pattern Matching for Array Pointers
         for array_name in ["strings", "procdefs", "miscs"]:
             array_len_ptr = all_extracted_addresses.get(f"{array_name}_len", None)
@@ -671,6 +685,9 @@ def main():
             else:
                 print(f"{WARN}[WARN] Length pointer for '{array_name}' not available.{RESET}")
 
+    # --- Section: Extracting procdef ---
+    section_divider("Extracting procdef")
+
     # Extract procdef
     procdef_info = {
         "pattern": base_info["procdef_pattern"]["pattern"],
@@ -679,6 +696,9 @@ def main():
     procdef_offset = extract_procdef(text_data, text_va, procdef_info)
     if procdef_offset:
         all_extracted_addresses["procdef"] = procdef_offset
+
+    # --- Section: Locating Functions ---
+    section_divider("Locating Functions")
 
     # Extract function RVAs using wildcard pattern matching
     func_patterns = base_info.get("functions", {})
@@ -691,10 +711,13 @@ def main():
         if pattern_offset != -1:
             final_rva = text_va + pattern_offset
             offsets[func] = final_rva
-            print(f"{INFO}[INFO] {func} RVA: 0x{final_rva:08X}{RESET}")
+            print(f"{INFO}[INFO] Resolved {func} RVA: 0x{final_rva:08X}{RESET}")
         else:
             print(f"{WARN}[WARN] Pattern for {func} not found.{RESET}")
             offsets[func] = None
+
+    # --- Section: Calculating Prologue Lengths ---
+    section_divider("Calculating Prologue Lengths")
 
     # Calculate prologue lengths
     prologue_lengths = calculate_prologue_lengths(binary, offsets, PROLOGUE_FUNCTION_NAMES)
@@ -712,8 +735,11 @@ def main():
     # Merge function offsets into all_extracted_addresses
     all_extracted_addresses.update({k: v for k, v in offsets.items() if v is not None})
 
+    # --- Section: Final Results ---
+    section_divider("Final Results")
+
     # Print results
-    print(f"\n{RESULTS}Extracted Addresses:{RESET}")
+    print(f"{RESULTS}Extracted Addresses:{RESET}")
     final_order = [
         "strings", 
         "strings_len",
