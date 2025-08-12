@@ -20,7 +20,16 @@ A Python-based tool for analyzing and extracting patterns and addresses from the
 
 ## Usage
 
-### Syntax
+### Run via GitHub Actions (recommended)
+You can run the extractor entirely from GitHub using the included Extract Signatures workflow.
+
+1. Go to the Actions tab in your fork.
+2. Select Extract Signatures from the left sidebar.
+3. Click Run workflow.
+4. Enter the BYOND versions you want to extract, for example: ["515.1590","515.1591"]
+5. Start the workflow — results will be in the run’s summary output.
+
+### Run Locally
 
 ```bash
 python binary_analysis.py <binary_path> [--use-old-elf]
