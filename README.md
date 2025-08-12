@@ -56,62 +56,97 @@ python binary_analysis.py /path/to/libbyond.so --use-old-elf
 ## Example output
 
 ```
-[INFO] Successfully loaded binary: .\byondcore1648.dll
-[INFO] Image Base (PE): 0x10000000
-[INFO] .text section found.
-[DEBUG] .text section VA: 0x00001000, Size: 3778058 bytes
-[INFO] Searching for Memory Diagnostics Anchor Pattern...
-[DEBUG] Pattern found at offset: 0x00116370
-[INFO] Memory Diagnostics Anchor found at RVA: 0x00117370
-[INFO] Computing address for 'strings_len':
-[DEBUG] Pattern RVA: 0x00117370 + Offset: 0x19 = Pointer RVA: 0x00117389
-[DEBUG] Read raw value: 0x1042497C from RVA: 0x00117389
-[INFO] Adjusted Address for 'strings_len': 0x0042497C
-[INFO] Computing address for 'procdefs_len':
-[DEBUG] Pattern RVA: 0x00117370 + Offset: 0x-96 = Pointer RVA: 0x001172DA
-[DEBUG] Read raw value: 0x1042499C from RVA: 0x001172DA
-[INFO] Adjusted Address for 'procdefs_len': 0x0042499C
-[INFO] Computing address for 'miscs_len':
-[DEBUG] Pattern RVA: 0x00117370 + Offset: 0x16F = Pointer RVA: 0x001174DF
-[DEBUG] Read raw value: 0x1042498C from RVA: 0x001174DF
-[INFO] Adjusted Address for 'miscs_len': 0x0042498C
-[DEBUG] Constructed pattern for 'strings': 8B 4D 08 3B 0D 7C 49 42 10 73 10 A1 ?? ?? ?? ?? 8B ?? 88
-[DEBUG] Wildcard pattern 'strings_pattern' found at offset: 0x0021FE33
-[DEBUG] Array pointer for 'strings' found at offset 0x0021FE33: 0x00424978
-[DEBUG] Constructed pattern for 'procdefs': 3B 05 9C 49 42 10 72 04 33 C0 5D C3 6B C0 ?? 03 05 ?? ?? ?? ??
-[DEBUG] Wildcard pattern 'procdefs_pattern' found at offset: 0x0021FE16
-[DEBUG] Array pointer for 'procdefs' found at offset 0x0021FE16: 0x00424998
-[DEBUG] Constructed pattern for 'miscs': 3B 0D 8C 49 42 10 72 04 33 C0 5D C3 A1 ?? ?? ?? ?? 8B ?? 88
-[DEBUG] Wildcard pattern 'miscs_pattern' found at offset: 0x001FC0F6
-[DEBUG] Array pointer for 'miscs' found at offset 0x001FC0F6: 0x00424988
-[DEBUG] Wildcard pattern 'procdef' found at offset: 0x001162AD
-[INFO] procdef Pattern RVA: 0x001172AD
+[INFO] Successfully loaded binary: .\libbyond_516.1666.so
+[INFO] Image Base (ELF): 0x00000000
+[INFO] .text section found at RVA 0x00133050 (VA 0x00133050), Size: 5412938 bytes
+[DEBUG] Searching for Memory Diagnostics Anchor Pattern...
+[DEBUG] Pattern found at .text+0x00233080
+[INFO] Memory Diagnostics Anchor found at RVA: 0x003660D0
+
+----------------------- Resolving Array Length Variables -----------------------
+[DEBUG] Pattern RVA: 0x003660D0 + Offset: 0x2A2 = Pointer RVA: 0x00366372
+[DEBUG] Read raw VA: 0x007EA02C from RVA: 0x00366372
+[INFO] Resolved strings_len RVA: 0x007EA02C
+[DEBUG] Pattern RVA: 0x003660D0 + Offset: 0x1EF = Pointer RVA: 0x003662BF
+[DEBUG] Read raw VA: 0x007E9FD4 from RVA: 0x003662BF
+[INFO] Resolved procdefs_len RVA: 0x007E9FD4
+[DEBUG] Pattern RVA: 0x003660D0 + Offset: 0x3A4 = Pointer RVA: 0x00366474
+[DEBUG] Read raw VA: 0x007EA014 from RVA: 0x00366474
+[INFO] Resolved miscs_len RVA: 0x007EA014
+
+------------------------------- Resolving Arrays -------------------------------
+[DEBUG] Constructed pattern for 'strings': 8B 44 24 20 39 05 2C A0 7E 00 76 17 8B 15 ?? ?? ?? ??
+[DEBUG] Wildcard pattern 'strings_pattern' found at .text+0x001AC425
+[DEBUG] Read raw VA for 'strings': 0x007EA030 from .text+0x001AC433
+[INFO] Resolved strings RVA: 0x007EA030
+[DEBUG] Constructed pattern for 'procdefs': 8B 44 24 04 39 05 D4 9F 7E 00 76 14 6B C0 ?? 03 05 ?? ?? ?? ??
+[DEBUG] Wildcard pattern 'procdefs_pattern' found at .text+0x001ADC90
+[DEBUG] Read raw VA for 'procdefs': 0x007E9FD8 from .text+0x001ADCA1
+[INFO] Resolved procdefs RVA: 0x007E9FD8
+[DEBUG] Constructed pattern for 'miscs': 8B 44 24 04 39 05 14 A0 7E 00 76 14 8B 15 ?? ?? ?? ??
+[DEBUG] Wildcard pattern 'miscs_pattern' found at .text+0x001ADC10
+[DEBUG] Read raw VA for 'miscs': 0x007EA018 from .text+0x001ADC1E
+[INFO] Resolved miscs RVA: 0x007EA018
+
+------------------------------ Extracting procdef ------------------------------
+[DEBUG] Wildcard pattern 'procdef' found at .text+0x00233243
+[INFO] procdef Pattern RVA: 0x00366293
 [INFO] Extracted procdef: 0x001C002C
-[DEBUG] Wildcard pattern 'exec_proc_pattern' found at offset: 0x00139660
-[INFO] exec_proc RVA: 0x0013A660
-[DEBUG] Wildcard pattern 'server_tick_pattern' found at offset: 0x00222A60
-[INFO] server_tick RVA: 0x00223A60
-[DEBUG] Wildcard pattern 'send_maps_pattern' found at offset: 0x001D4DD0
-[INFO] send_maps RVA: 0x001D5DD0
-[DEBUG] Function RVA: 0x001D5DD0, .text VA: 0x00001000, Offset: 0x001D4DD0
+
+------------------------------ Locating Functions ------------------------------
+[DEBUG] Wildcard pattern 'exec_proc_pattern' found at .text+0x002431E0
+[INFO] Resolved exec_proc RVA: 0x00376230
+[DEBUG] Wildcard pattern 'server_tick_pattern' found at .text+0x0022DE10
+[INFO] Resolved server_tick RVA: 0x00360E60
+[DEBUG] Wildcard pattern 'send_maps_pattern' found at .text+0x0021CA40
+[INFO] Resolved send_maps RVA: 0x0034FA90
+[DEBUG] Wildcard pattern 'erasure_pattern' found at .text+0x0029F700
+[INFO] Resolved erasure RVA: 0x003D2750
+[DEBUG] Wildcard pattern 'event_io_pattern' found at .text+0x00357500
+[INFO] Resolved event_io RVA: 0x0048A550
+[DEBUG] Wildcard pattern 'mkstr_pattern' found at .text+0x001A0B80
+[INFO] Resolved mkstr RVA: 0x002D3BD0
+[DEBUG] Wildcard pattern 'rebalance_pattern' found at .text+0x0019E8F0
+[INFO] Resolved rebalance RVA: 0x002D1940
+
+------------------------- Calculating Prologue Lengths -------------------------
+[DEBUG] Function RVA: 0x00376230, .text VA: 0x00133050, Offset: 0x002431E0
+[INFO] Prologue length for exec_proc: 5 bytes
+[DEBUG] Function RVA: 0x0034FA90, .text VA: 0x00133050, Offset: 0x0021CA40
 [INFO] Prologue length for send_maps: 5 bytes
-[DEBUG] Function RVA: 0x00223A60, .text VA: 0x00001000, Offset: 0x00222A60
-[INFO] Prologue length for server_tick: 6 bytes
-[DEBUG] Function RVA: 0x0013A660, .text VA: 0x00001000, Offset: 0x00139660
-[INFO] Prologue length for exec_proc: 6 bytes
+[DEBUG] Function RVA: 0x00360E60, .text VA: 0x00133050, Offset: 0x0022DE10
+[INFO] Prologue length for server_tick: 5 bytes
+[DEBUG] Function RVA: 0x0048A550, .text VA: 0x00133050, Offset: 0x00357500
+[INFO] Prologue length for event_io: 8 bytes
+[DEBUG] Function RVA: 0x003D2750, .text VA: 0x00133050, Offset: 0x0029F700
+[INFO] Prologue length for erasure: 5 bytes
+[DEBUG] Function RVA: 0x002D1940, .text VA: 0x00133050, Offset: 0x0019E8F0
+[INFO] Prologue length for rebalance: 5 bytes
+[DEBUG] Function RVA: 0x002D3BD0, .text VA: 0x00133050, Offset: 0x001A0B80
+[INFO] Prologue length for mkstr: 5 bytes
 
+-------------------------------- Final Results ---------------------------------
 Extracted Addresses:
-  strings: 0x00424978
-  strings_len: 0x0042497C
-  miscs: 0x00424988
-  miscs_len: 0x0042498C
-  procdefs: 0x00424998
-  procdefs_len: 0x0042499C
+  strings: 0x007EA030
+  strings_len: 0x007EA02C
+  miscs: 0x007EA018
+  miscs_len: 0x007EA014
+  procdefs: 0x007E9FD8
+  procdefs_len: 0x007E9FD4
   procdef: 0x001C002C
-  exec_proc: 0x0013A660
-  server_tick: 0x00223A60
-  send_maps: 0x001D5DD0
-  prologue: 0x00050606
+  exec_proc: 0x00376230
+  server_tick: 0x00360E60
+  send_maps: 0x0034FA90
+  prologue: 0x00050505
 
-{0x00424978, 0x0042497C, 0x00424988, 0x0042498C, 0x00424998, 0x0042499C, 0x001C002C, 0x0013A660, 0x00223A60, 0x001D5DD0, 0x00050606}
+{0x007EA030, 0x007EA02C, 0x007EA018, 0x007EA014, 0x007E9FD8, 0x007E9FD4, 0x001C002C, 0x00376230, 0x00360E60, 0x0034FA90, 0x00050505}
+
+Experimental Addresses:
+  erasure: 0x003D2750
+  event_io: 0x0048A550
+  mkstr: 0x002D3BD0
+  rebalance: 0x002D1940
+  prologue2: 0x05050805
+
+{0x007EA030, 0x007EA02C, 0x007EA018, 0x007EA014, 0x007E9FD8, 0x007E9FD4, 0x001C002C, 0x00376230, 0x00360E60, 0x0034FA90, 0x00050505, 0x003D2750, 0x0048A550, 0x002D3BD0, 0x002D1940, 0x05050805}
 ```
