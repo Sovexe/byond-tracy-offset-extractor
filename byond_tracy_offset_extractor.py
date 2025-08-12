@@ -9,17 +9,19 @@ import lief
 import sys
 import os
 from typing import List, Optional
-from colorama import Fore, Style, init
 from capstone import Cs, CS_ARCH_X86, CS_MODE_32
 
-# Initialize colorama
-init(autoreset=True)
-INFO = Fore.CYAN
-DEBUG = Fore.MAGENTA
-ERROR = Fore.RED
-WARN = Fore.YELLOW
-RESULTS = Fore.GREEN
-RESET = Style.RESET_ALL
+# ANSI escape codes for colors
+INFO    = "\033[36m"   # Cyan
+DEBUG   = "\033[35m"   # Magenta
+ERROR   = "\033[31m"   # Red
+WARN    = "\033[33m"   # Yellow
+RESULTS = "\033[32m"   # Green
+RESET   = "\033[0m"    # Reset
+
+# Auto-disable colors if not a TTY (e.g., output is being piped to a file)
+if not sys.stdout.isatty():
+    INFO = DEBUG = ERROR = WARN = RESULTS = RESET = ""
 
 # Define the Memory Diagnostics Anchor Patterns and Relative Offsets for PE and ELF
 PATTERNS_AND_OFFSETS = {
