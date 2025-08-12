@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       major_version:
-        description: 'Major version to process (e.g., 514 or 515)'
+        description: 'Major version to process (e.g., 514, 515, or 516)'
         required: true
-        default: '515'
+        default: '516'
 
 jobs:
   extract_all:
@@ -22,7 +22,7 @@ jobs:
         MAJOR_VERSION="${{ github.event.inputs.major_version }}"
         {
           echo 'RAW_VERSIONS<<EOF'
-          curl -s https://www.byond.com/download/build/${MAJOR_VERSION}/
+          curl -s https://spacestation13.github.io/byond-builds/${MAJOR_VERSION}/
           echo EOF
         } >> "$GITHUB_ENV"
 
