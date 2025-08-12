@@ -1,6 +1,6 @@
 # BYOND Tracy Offset Extractor
 
-A Python-based tool for analyzing and extracting patterns and addresses from the BYOND PE and ELF binaries for use with [`byond-tracy`](https://github.com/mafemergency/byond-tracy). Script will break if / when Lummox makes compiler changes or if the anchor patterns become misaligned.
+A Python-based tool for analyzing and extracting patterns and addresses from the BYOND PE and ELF binaries for use with https://github.com/spacestation13/byond-tracy. Script will break if / when Lummox makes compiler changes or if the anchor patterns become misaligned.
 
 ---
 
@@ -159,3 +159,4 @@ Experimental Addresses:
 
 {0x007EA030, 0x007EA02C, 0x007EA018, 0x007EA014, 0x007E9FD8, 0x007E9FD4, 0x001C002C, 0x00376230, 0x00360E60, 0x0034FA90, 0x00050505, 0x003D2750, 0x0048A550, 0x002D3BD0, 0x002D1940, 0x05050805}
 ```
+
