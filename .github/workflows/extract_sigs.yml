@@ -24,110 +24,112 @@ jobs:
         os: [windows, linux]
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.x'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install lief
-        pip install capstone
-        pip install colorama
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install lief 
+          pip install capstone
 
-    - name: Set BYOND version
-      run: |
-        BYOND_VERSION="${{ matrix.byond_version }}"
-        # Remove the leading 'v' from the version
-        BYOND_VERSION="${BYOND_VERSION#v}"
-        echo "BYOND_VERSION=$BYOND_VERSION" >> "$GITHUB_ENV"
+      - name: Set BYOND version
+        run: |
+          BYOND_VERSION="${{ matrix.byond_version }}"
+          # Remove the leading 'v' from the version
+          BYOND_VERSION="${BYOND_VERSION#v}"
+          echo "BYOND_VERSION=$BYOND_VERSION" >> "$GITHUB_ENV"
 
-    - name: Download BYOND
-      run: |
-        MAJOR_VERSION=$(echo "$BYOND_VERSION" | cut -d'.' -f1)
-        if [ "${{ matrix.os }}" == "windows" ]; then
+      - name: Download BYOND
+        run: |
+          set -euo pipefail
+          MAJOR_VERSION=$(echo "$BYOND_VERSION" | cut -d'.' -f1)
+          if [ "${{ matrix.os }}" == "windows" ]; then
             DOWNLOAD_URL="https://spacestation13.github.io/byond-builds/${MAJOR_VERSION}/${BYOND_VERSION}_byond.zip"
           else
             DOWNLOAD_URL="https://spacestation13.github.io/byond-builds/${MAJOR_VERSION}/${BYOND_VERSION}_byond_linux.zip"
-        fi
-        wget $DOWNLOAD_URL -O byond.zip
-        unzip byond.zip
+          fi
+          wget $DOWNLOAD_URL -O byond.zip
+          unzip byond.zip
 
-    - name: Determine target file
-      id: determine_target
-      run: |
-        if [ "${{ matrix.os }}" == "windows" ]; then
-          echo "target_file=byond/bin/byondcore.dll" >> "$GITHUB_OUTPUT"
-        else
-          echo "target_file=byond/bin/libbyond.so" >> "$GITHUB_OUTPUT"
-        fi
+      - name: Determine target file
+        id: determine_target
+        run: |
+          if [ "${{ matrix.os }}" == "windows" ]; then
+            echo "target_file=byond/bin/byondcore.dll" >> "$GITHUB_OUTPUT"
+          else
+            echo "target_file=byond/bin/libbyond.so" >> "$GITHUB_OUTPUT"
+          fi
 
-    - name: Determine if old ELF format is needed
-      id: determine_elf
-      run: |
-        MINOR_VERSION=$(echo "$BYOND_VERSION" | cut -d'.' -f2)
-        if [ "${{ matrix.os }}" == "linux" ] && [ "$MINOR_VERSION" -lt 1644 ]; then
-          echo "use_old_elf=true" >> "$GITHUB_OUTPUT"
-        else
-          echo "use_old_elf=false" >> "$GITHUB_OUTPUT"
-        fi
+      - name: Determine if old ELF format is needed
+        id: determine_elf
+        run: |
+          MINOR_VERSION=$(echo "$BYOND_VERSION" | cut -d'.' -f2)
+          if [ "${{ matrix.os }}" == "linux" ] && [ "$MINOR_VERSION" -lt 1644 ]; then
+            echo "use_old_elf=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "use_old_elf=false" >> "$GITHUB_OUTPUT"
+          fi
 
-    - name: Run extraction script
-      run: |
-        if [ "${{ steps.determine_elf.outputs.use_old_elf }}" == "true" ]; then
-          python byond_tracy_offset_extractor.py "${{ steps.determine_target.outputs.target_file }}" --use-old-elf
-        else
-          python byond_tracy_offset_extractor.py "${{ steps.determine_target.outputs.target_file }}"
-        fi
+      - name: Run extraction script
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.determine_elf.outputs.use_old_elf }}" = "true" ]; then
+            python byond_tracy_offset_extractor.py "${{ steps.determine_target.outputs.target_file }}" --use-old-elf | tee extractor.log
+          else
+            python byond_tracy_offset_extractor.py "${{ steps.determine_target.outputs.target_file }}" | tee extractor.log
+          fi
 
-    - name: Parse curly-brace signatures to JSON
-      run: |
-        set -euo pipefail
+      - name: Parse curly-brace signatures to JSON
+        run: |
+          set -euo pipefail
 
-        # Find first 11-address brace line
-        SIG_LINE=$(grep -m1 -E '^\{0x[0-9A-Fa-f]{8}(, 0x[0-9A-Fa-f]{8}){10}\}$' extractor.log || true)
-        if [ -z "$SIG_LINE" ]; then
-          echo "No 11-value signature line found; skipping."
-          exit 0
-        fi
+          # Find the formatted addresses line
+          SIG_LINE=$(grep -m1 -E '^\{0x[0-9A-Fa-f]{8}(, 0x[0-9A-Fa-f]{8}){10}\}$' extractor.log || true)
 
-        # -> JSON array of strings
-        SIG_JSON=$(echo "$SIG_LINE" \
-          | sed -e 's/^{/["/' -e 's/}$/"]/ ' -e 's/, /", "/g')
+          # Experimental Addresses
+          EXP_LINE=$(awk '/^Experimental Addresses:/{f=1;next} f && /^\{0x/{print;f=0}' extractor.log | head -n1)
 
-        # Experimental brace line (16 values). If none, null.
-        EXP_LINE=$(awk '/^Experimental Addresses:/{f=1;next} f && /^\{0x/{print;f=0}' extractor.log | head -n1)
-        if [ -n "$EXP_LINE" ]; then
-          EXP_JSON=$(echo "$EXP_LINE" \
-            | sed -e 's/^{/["/' -e 's/}$/"]/ ' -e 's/, /", "/g')
-        else
-          EXP_JSON=null
-        fi
+          if [ -z "$SIG_LINE" ]; then
+            echo "No address line found in extractor.log"
+            ADDR_JSON='[]'
+          else
+            ADDR_JSON=$(echo "$SIG_LINE" \
+              | sed -e 's/^{/["/' -e 's/}$/"]/ ' -e 's/, /", "/g')
+          fi
 
-        mkdir -p site
+          if [ -n "$EXP_LINE" ]; then
+            EXP_JSON=$(echo "$EXP_LINE" \
+              | sed -e 's/^{/["/' -e 's/}$/"]/ ' -e 's/, /", "/g')
+          else
+            EXP_JSON=null
+          fi
 
-        # Build JSON with jq
-        jq -n \
-          --arg version "$BYOND_VERSION" \
-          --arg platform "${{ matrix.os }}" \
-          --arg build_at "$(date -u +%FT%TZ)" \
-          --argjson addresses "$SIG_JSON" \
-          --argjson experimental "$EXP_JSON" \
-          '{schema:1, version:$version, platform:$platform, addresses:$addresses, experimental:$experimental, build_at:$build_at}' \
-          > "site/${{ matrix.os }}-${BYOND_VERSION}.json"
+          mkdir -p site
+          jq -n \
+            --arg version "$BYOND_VERSION" \
+            --arg platform "${{ matrix.os }}" \
+            --arg build_at "$(date -u +%FT%TZ)" \
+            --argjson addresses "$ADDR_JSON" \
+            --argjson experimental "$EXP_JSON" \
+            '{schema:1, version:$version, platform:$platform, addresses:$addresses, experimental:$experimental, build_at:$build_at}' \
+            > "site/${{ matrix.os }}-${BYOND_VERSION}.json"
 
-        echo "Wrote site/${{ matrix.os }}-${BYOND_VERSION}.json"
+          echo "Wrote site/${{ matrix.os }}-${BYOND_VERSION}.json"
+          ls -l site
 
-    - name: Upload page fragment
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: site-fragments
-        path: site/*.json
+      - name: Upload page fragment
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-fragments
+          path: site/*.json
+          if-no-files-found: ignore
 
   publish_pages:
     needs: extract
@@ -151,44 +153,57 @@ jobs:
           mkdir -p public
 
           # Per-version/per-platform files under public/v/<version>/<platform>.json
-          while IFS= read -r f; do
-            base=$(basename "$f" .json)          # e.g., linux-516.1666
-            plat=${base%%-*}                     # linux
-            ver=${base#*-}                       # 516.1666
+          find site -name '*.json' -print | sort | while read -r f; do
+            base=$(basename "$f" .json)   # e.g., linux-516.1666
+            plat=${base%%-*}              # linux
+            ver=${base#*-}                # 516.1666
             mkdir -p "public/v/$ver"
             jq -c '.' "$f" > "public/v/$ver/$plat.json"
-          done < <(find site -name '*.json' -print | sort)
+          done
 
-          # data.json = flattened array of every row (stable order by version asc, then platform)
-          jq -s '[ .[] ]' public/v/*/*.json \
-            | jq 'sort_by(.version | split(".") | map(tonumber)) | sort_by(.platform)' \
-            > public/data.json
+          # data.json = flattened array of every row (stable order: version asc, platform asc)
+          if ls public/v/*/*.json >/dev/null 2>&1; then
+            jq -s '[ .[] ]' public/v/*/*.json \
+              | jq 'sort_by(.version | split(".") | map(tonumber)) | sort_by(.platform)' \
+              > public/data.json
+          else
+            echo '[]' > public/data.json
+          fi
 
           # index.json (list of versions + latest pointers)
           jq -r '.[].version' public/data.json \
             | sort -t. -k1,1n -k2,2n \
-            | uniq > versions.txt
+            | uniq > versions.txt || true
 
-          latest=$(tail -n1 versions.txt || echo "")
+          latest=$(tail -n1 versions.txt 2>/dev/null || echo "")
           latest_linux=$(jq -r '
             [.[]|select(.platform=="linux")]
-            | max_by(.version|split(".")|map(tonumber))?.version // empty
+            | (max_by(.version|split(".")|map(tonumber))?.version // empty)
           ' public/data.json)
           latest_windows=$(jq -r '
             [.[]|select(.platform=="windows")]
-            | max_by(.version|split(".")|map(tonumber))?.version // empty
+            | (max_by(.version|split(".")|map(tonumber))?.version // empty)
           ' public/data.json)
 
-          jq -n --argjson versions "$(jq -R -s 'split("\n")[:-1]' versions.txt)" \
+          jq -n --argjson versions "$(jq -R -s 'split("\n")[:-1]' versions.txt 2>/dev/null || echo '[]')" \
                 --arg any "$latest" --arg linux "$latest_linux" --arg windows "$latest_windows" \
             '{schema:1, versions:$versions, latest:{any:$any, linux:$linux, windows:$windows}}' \
             > public/index.json
 
           # latest aliases
-          [ -n "$latest_linux" ]   && jq -c '.' "public/v/$latest_linux/linux.json"   > public/latest-linux.json  || true
-          [ -n "$latest_windows" ] && jq -c '.' "public/v/$latest_windows/windows.json" > public/latest-windows.json || true
-          if [ -f public/latest-linux.json ]; then cp public/latest-linux.json public/latest.json
-          elif [ -f public/latest-windows.json ]; then cp public/latest-windows.json public/latest.json
+          if [ -n "$latest_linux" ] && [ -f "public/v/$latest_linux/linux.json" ]; then
+            jq -c '.' "public/v/$latest_linux/linux.json" > public/latest-linux.json
+          fi
+          if [ -n "$latest_windows" ] && [ -f "public/v/$latest_windows/windows.json" ]; then
+            jq -c '.' "public/v/$latest_windows/windows.json" > public/latest-windows.json
+          fi
+          if [ -f public/latest-linux.json ]; then
+            cp public/latest-linux.json public/latest.json
+          elif [ -f public/latest-windows.json ]; then
+            cp public/latest-windows.json public/latest.json
+          else
+            # fallback empty latest
+            echo '{}' > public/latest.json
           fi
 
           # Optional CSV (easy mode for shells/Excel)
@@ -197,7 +212,7 @@ jobs:
             (.[] | [ .version, .platform, (.addresses|join(" ")) ] | @csv)
           ' public/data.json > public/data.csv
 
-          # Minimal index.html (renders data.json in <pre>)
+          # Minimal index.html (renders data.json)
           cat > public/index.html <<'HTML'
           <!doctype html><meta charset="utf-8">
           <title>BYOND Signatures</title>
