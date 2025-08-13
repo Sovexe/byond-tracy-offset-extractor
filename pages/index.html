@@ -41,12 +41,12 @@
     <section class="card">
       <h3>Primary Endpoints</h3>
       <ul>
-        <li><a href="data.json">data.json</a> — full dataset (array of items).</li>
-        <li><a href="index.json">index.json</a> — version list + latest pointers.</li>
-        <li><a href="data.csv">data.csv</a> — CSV for quick & dirty consumers.</li>
-        <li><a href="latest.json">latest.json</a> — latest across platforms.</li>
-        <li><a href="latest-linux.json">latest-linux.json</a> — latest Linux.</li>
-        <li><a href="latest-windows.json">latest-windows.json</a> — latest Windows.</li>
+        <li><a href="data.json">data.json</a> - full dataset (array of items).</li>
+        <li><a href="index.json">index.json</a> - version list + latest pointers.</li>
+        <li><a href="data.csv">data.csv</a> - CSV for quick & dirty consumers.</li>
+        <li><a href="latest.json">latest.json</a> - latest across platforms.</li>
+        <li><a href="latest-linux.json">latest-linux.json</a> - latest Linux.</li>
+        <li><a href="latest-windows.json">latest-windows.json</a> - latest Windows.</li>
       </ul>
       <div>
   <div class="muted" style="margin-bottom:6px">Schema (per item)</div>
@@ -187,8 +187,8 @@ console.log('addresses', '{' + j.addresses.join(', ') + '}');
           const set = map.get(v) || new Set();
           const tr = document.createElement('tr');
           tr.className='row';
-          const linux = set.has('linux') ? `<a href="v/${v}/linux.json">linux.json</a>` : '<span class="muted">—</span>';
-          const win   = set.has('windows') ? `<a href="v/${v}/windows.json">windows.json</a>` : '<span class="muted">—</span>';
+          const linux = set.has('linux') ? `<a href="v/${v}/linux.json">linux.json</a>` : '<span class="muted">-</span>';
+          const win   = set.has('windows') ? `<a href="v/${v}/windows.json">windows.json</a>` : '<span class="muted">-</span>';
           tr.innerHTML = `<td>v${v}</td><td>${linux}</td><td>${win}</td>`;
           tbody.appendChild(tr);
         }

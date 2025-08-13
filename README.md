@@ -29,6 +29,9 @@ You can run the extractor entirely from GitHub using the included Extract Signat
 4. Enter the BYOND version(s) you want to extract, for example: `["515.1590","515.1591"]`
 5. Start the workflow - results will be in the run’s summary output.
 
+### GitHub Pages Output (recommended)
+You can access the latest published results here:  
+**https://sovexe.github.io/byond-tracy-offset-extractor/**
 ### Run Locally
 
 ```bash
