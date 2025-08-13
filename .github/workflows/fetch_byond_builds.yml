@@ -5,6 +5,7 @@ on:
     - cron: "0 */1 * * *"   # hourly
   workflow_dispatch: {}
 
+# Ensure only one run publishes at a time; cancel overlapping runs
 concurrency:
   group: byond-sync-pages
   cancel-in-progress: true
@@ -24,26 +25,59 @@ jobs:
       chunks: ${{ steps.prepare_chunks.outputs.chunks }}
       count: ${{ steps.prepare_chunks.outputs.count }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Tools
         run: |
           set -euo pipefail
           sudo apt-get update -y
           sudo apt-get install -y jq curl
 
-      - name: Fetch our index.json (may be empty on first run)
-        run: |
-          set -euo pipefail
-          curl -fsS "$PAGES_BASE/index.json" -o ours.json || echo '{}' > ours.json
-
-      - name: Determine majors [515..latest]
+      - name: Determine majors [515..latest] and upstream latest
         id: majors
         run: |
           set -euo pipefail
           UPSTREAM_VER="$(curl -fsS "$BUILDS_BASE/version.txt" | tr -d '\r\n')"
           LATEST_MAJOR="${UPSTREAM_VER%%.*}"
+          echo "upstream_ver=$UPSTREAM_VER" >> "$GITHUB_OUTPUT"
           seq "$MIN_MAJOR" "$LATEST_MAJOR" > majors.txt
           echo "Upstream latest: $UPSTREAM_VER"
           echo "Majors: $(tr '\n' ' ' < majors.txt)"
+
+      - name: Early exit if upstream latest is already published
+        id: early
+        run: |
+          set -euo pipefail
+          UPSTREAM_VER="${{ steps.majors.outputs.upstream_ver }}"
+          MAJOR="${UPSTREAM_VER%%.*}"
+
+          # Which platforms exist upstream for the latest?
+          have_win=0; have_lin=0
+          curl -fsI "$BUILDS_BASE/$MAJOR/${UPSTREAM_VER}_byond.zip" >/dev/null 2>&1 && have_win=1 || true
+          curl -fsI "$BUILDS_BASE/$MAJOR/${UPSTREAM_VER}_byond_linux.zip" >/dev/null 2>&1 && have_lin=1 || true
+
+          # Consider "up to date" only for platforms that exist upstream
+          ok_win=0; ok_lin=0
+          if [ "$have_win" -eq 1 ]; then
+            curl -fsI "$PAGES_BASE/v/$UPSTREAM_VER/windows.json" >/dev/null 2>&1 && ok_win=1 || ok_win=0
+          else
+            ok_win=1
+          fi
+          if [ "$have_lin" -eq 1 ]; then
+            curl -fsI "$PAGES_BASE/v/$UPSTREAM_VER/linux.json" >/dev/null 2>&1 && ok_lin=1 || ok_lin=0
+          else
+            ok_lin=1
+          fi
+
+          if [ "$ok_win" -eq 1 ] && [ "$ok_lin" -eq 1 ]; then
+            echo "Already published latest ($UPSTREAM_VER) for all upstream platforms; skipping."
+            echo "chunks=[]" >> "$GITHUB_OUTPUT"
+            echo "count=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Not up to date with latest ($UPSTREAM_VER); proceeding."
 
       - name: Crawl upstream versions (keep if ≥1 ZIP exists)
         run: |
@@ -52,10 +86,12 @@ jobs:
             local major="$1" ver="$2"
             local win="$BUILDS_BASE/${major}/${ver}_byond.zip"
             local lin="$BUILDS_BASE/${major}/${ver}_byond_linux.zip"
+            # Accept releases where either platform exists (there are win-only / linux-only hotfixes)
             curl -fsI "$win" >/dev/null 2>&1 && return 0
             curl -fsI "$lin" >/dev/null 2>&1 && return 0
             return 1
           }
+
           : > upstream.sorted.txt
           while read -r MAJOR; do
             HTML="$(curl -fsS "$BUILDS_BASE/$MAJOR/" || true)"
@@ -67,26 +103,18 @@ jobs:
                   have_any_zip "$MAJOR" "$VER" && echo "$VER"
                 done
           done < majors.txt | sort -u > upstream.sorted.txt
-          echo "Found upstream versions: $(wc -l < upstream.sorted.txt)"
 
-      - name: Compute missing (upstream - ours)
-        run: |
-          set -euo pipefail
-          jq -r '.versions // [] | .[]' ours.json 2>/dev/null | sort -u > ours.versions.txt || true
-          cp upstream.sorted.txt upstream.versions.txt
-          comm -13 ours.versions.txt upstream.versions.txt > missing.txt || true
-          if [ -s missing.txt ]; then
-            jq -R -s -c 'split("\n")[:-1]' missing.txt > missing.json
-          else
-            echo '[]' > missing.json
-          fi
-          echo "Missing count: $(jq 'length' missing.json)"
+          echo "Found upstream versions: $(wc -l < upstream.sorted.txt)"
+          echo "Sample:"; head -n 5 upstream.sorted.txt || true
 
       - name: Prepare chunks of ${{ env.CHUNK_SIZE }}
         id: prepare_chunks
         run: |
           set -euo pipefail
-          # Make a JSON array of JSON-string chunks, e.g.:
+          # Make a JSON array of all upstream versions
+          ALL_JSON="$(jq -R -s 'split("\n")[:-1]' upstream.sorted.txt)"
+
+          # CHUNKS is an array of JSON strings; each string is a JSON array of versions:
           # ["[\"515.1646\",\"515.1647\"]","[\"516.1666\",\"516.1667\"]", ...]
           CHUNKS="$(
             jq -c --argjson n "${CHUNK_SIZE}" '
@@ -95,15 +123,18 @@ jobs:
                 else [ range(0; length; $n) as $i
                        | ( .[$i:($i+$n)] | @json ) ]
                 end;
-              chunks($n)
-            ' missing.json
+              . as $all | ($all | chunks($n))
+            ' <<< "$ALL_JSON"
           )"
-          COUNT="$(jq 'length' missing.json)"
 
-          # Force single-line output for matrix expansion
+          COUNT="$(jq 'length' <<< "$ALL_JSON")"
+
+          # Single-line outputs (matrix parser hates newlines)
           CHUNKS_ONE_LINE="$(printf %s "$CHUNKS" | tr -d '\n')"
           echo "chunks=$CHUNKS_ONE_LINE" >> "$GITHUB_OUTPUT"
           echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+
+          echo "Prepared $(jq 'length' <<< "$CHUNKS") chunks from $COUNT versions."
 
   extract_chunks:
     needs: fetch_byond_builds
@@ -130,7 +161,7 @@ jobs:
     environment:
       name: github-pages
     steps:
-      - name: Checkout repo (for pages/index.html)
+      - name: Checkout repo (for pages/index.html and any other assets)
         uses: actions/checkout@v4
 
       - name: Download ALL fragments
@@ -144,6 +175,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p public
+
           # Per-version/per-platform → public/v/<version>/<platform>.json
           find fragments -name '*.json' -print | sort | while read -r f; do
             base=$(basename "$f" .json)
