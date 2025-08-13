@@ -2,8 +2,7 @@ name: Fetch BYOND Builds
 
 on:
   schedule:
-    # run every hour
-    - cron: "0 */1 * * *"
+    - cron: "0 */1 * * *"   # hourly
   workflow_dispatch: {}
 
 concurrency:
@@ -87,26 +86,25 @@ jobs:
         id: prepare_chunks
         run: |
           set -euo pipefail
-          # Build array of objects so matrix expands reliably:
-          # [{ "i":0, "versions":[...chunk0...] }, { "i":1, "versions":[...chunk1...] }, ...]
+          # Make a JSON array of JSON-string chunks, e.g.:
+          # ["[\"515.1646\",\"515.1647\"]","[\"516.1666\",\"516.1667\"]", ...]
           CHUNKS="$(
             jq -c --argjson n "${CHUNK_SIZE}" '
               def chunks($n):
                 if length==0 then []
                 else [ range(0; length; $n) as $i
-                       | { i: ($i/$n|floor), versions: .[$i:($i+$n)] } ]
+                       | ( .[$i:($i+$n)] | @json ) ]
                 end;
               chunks($n)
             ' missing.json
           )"
           COUNT="$(jq 'length' missing.json)"
 
-          # Ensure single-line JSON output for matrix
+          # Force single-line output for matrix expansion
           CHUNKS_ONE_LINE="$(printf %s "$CHUNKS" | tr -d '\n')"
           echo "chunks=$CHUNKS_ONE_LINE" >> "$GITHUB_OUTPUT"
           echo "count=$COUNT" >> "$GITHUB_OUTPUT"
 
-  # Run the extractor per chunk, but DO NOT publish here.
   extract_chunks:
     needs: fetch_byond_builds
     if: ${{ fromJson(needs.fetch_byond_builds.outputs.count) > 0 }}
@@ -115,14 +113,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        chunk: ${{ fromJson(needs.fetch_byond_builds.outputs.chunks) }}
-      # parallel extract is fine; these jobs only upload site fragments
+        versions: ${{ fromJson(needs.fetch_byond_builds.outputs.chunks) }}
       max-parallel: 3
     uses: ./.github/workflows/extract_sigs.yml
     with:
-      versions: ${{ toJson(matrix.chunk.versions) }}
+      # Each matrix item is already a JSON array string like ["515.1646","515.1647"]
+      versions: ${{ matrix.versions }}
 
-  # Single publish job at the very end — avoids 409 conflicts and racing deploys.
   publish_pages:
     needs: [fetch_byond_builds, extract_chunks]
     if: ${{ always() && fromJson(needs.fetch_byond_builds.outputs.count) > 0 }}
@@ -147,7 +144,6 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p public
-
           # Per-version/per-platform → public/v/<version>/<platform>.json
           find fragments -name '*.json' -print | sort | while read -r f; do
             base=$(basename "$f" .json)
