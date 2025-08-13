@@ -178,12 +178,14 @@ jobs:
 
           latest=$(tail -n1 versions.txt 2>/dev/null || echo "")
           latest_linux=$(jq -r '
-            [.[]|select(.platform=="linux")]
-            | (max_by(.version|split(".")|map(tonumber))?.version // empty)
+            [.[] | select(.platform=="linux")]
+            | (max_by(.version | split(".") | map(tonumber)) // empty)
+            | if . == null then "" else .version end
           ' public/data.json)
           latest_windows=$(jq -r '
-            [.[]|select(.platform=="windows")]
-            | (max_by(.version|split(".")|map(tonumber))?.version // empty)
+            [.[] | select(.platform=="windows")]
+            | (max_by(.version | split(".") | map(tonumber)) // empty)
+            | if . == null then "" else .version end
           ' public/data.json)
 
           jq -n --argjson versions "$(jq -R -s 'split("\n")[:-1]' versions.txt 2>/dev/null || echo '[]')" \
