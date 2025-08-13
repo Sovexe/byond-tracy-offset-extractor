@@ -54,7 +54,7 @@ jobs:
           else
             DOWNLOAD_URL="https://spacestation13.github.io/byond-builds/${MAJOR_VERSION}/${BYOND_VERSION}_byond_linux.zip"
           fi
-          wget $DOWNLOAD_URL -O byond.zip
+          wget "$DOWNLOAD_URL" -O byond.zip
           unzip byond.zip
 
       - name: Determine target file
@@ -140,6 +140,9 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download fragments
         uses: actions/download-artifact@v4
         with:
@@ -214,10 +217,12 @@ jobs:
             (.[] | [ .version, .platform, (.addresses|join(" ")) ] | @csv)
           ' public/data.json > public/data.csv
 
-      - name: Copy site assets
+      - name: Copy site assets (pages/index.html)
         run: |
+          set -euo pipefail
           mkdir -p public
-          cp -R pages/* public/ || true
+          test -f pages/index.html || { echo "ERROR: pages/index.html not found. Commit it to the repo."; exit 1; }
+          cp -R pages/* public/
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
