@@ -120,7 +120,6 @@ jobs:
     uses: ./.github/workflows/extract_sigs.yml
     with:
       versions: ${{ toJson(matrix.chunk) }}
-      publish: false
 
   # Single publish job at the very end
   publish_pages:
