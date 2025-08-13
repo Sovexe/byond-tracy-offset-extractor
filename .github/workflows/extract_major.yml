@@ -30,7 +30,7 @@ jobs:
     - name: Parse and get unique BYOND versions
       id: parse_versions
       run: |
-        PARSED_VERSIONS=$(echo "$RAW_VERSIONS" | grep -oP '(?<=href=")${{ github.event.inputs.major_version }}\.\d{4}(?=_byond\.exe)')
+        PARSED_VERSIONS=$(echo "$RAW_VERSIONS" | grep -oP "(?<=href=['\"])${{ github.event.inputs.major_version }}\.\d{4}(?=_byond\.exe)")
         {
           echo 'UNIQUE_VERSIONS<<EOF'
           echo "$PARSED_VERSIONS" | sort -u | jq -R -s -c 'split("\n")[:-1]' | jq 'map("v\(. )")'
