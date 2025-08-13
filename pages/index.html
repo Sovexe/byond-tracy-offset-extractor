@@ -17,7 +17,7 @@
   a{color:var(--link);text-decoration:none}
   a:hover{text-decoration:underline}
   code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
-  pre{background:#0b0b0b;border:1px solid var(--border);border-radius:8px;padding:10px;overflow:auto}
+  pre{background:#0b0b0b;border:1px solid var(--border);border-radius:8px;padding:10px;overflow:auto;margin:0}
   table{width:100%;border-collapse:collapse}
   th,td{border-bottom:1px solid var(--border);padding:8px 10px;text-align:left}
   th{color:var(--muted);font-weight:600}
@@ -26,15 +26,17 @@
   .flex{display:flex;gap:10px;flex-wrap:wrap}
   .right{margin-left:auto}
   .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  select,button{background:#0b0b0b;border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:6px}
-  button{cursor:pointer}
-  .mono{white-space:pre;overflow:auto}
+  select{background:#0b0b0b;border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:6px}
+  .box{margin-top:8px}
+  .boxhdr{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .copy{margin-left:auto;background:#0b0b0b;border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:6px;cursor:pointer}
+  .copy.ok{border-color:#3fb950;box-shadow:0 0 0 2px rgba(63,185,80,.25) inset}
   </style>
 </head>
 <body>
   <header>
     <div class="wrap">
-      <h1>BYOND Signatures - API & Links</h1>
+      <h1>BYOND Signatures – API & Links</h1>
       <div class="muted">Static, scraper-friendly JSON endpoints published by GitHub Actions.</div>
     </div>
   </header>
@@ -45,13 +47,12 @@
       <ul>
         <li><a href="data.json">data.json</a> - full dataset (array of items).</li>
         <li><a href="index.json">index.json</a> - version list + latest pointers.</li>
-        <li><a href="data.csv">data.csv</a> - CSV for quick & dirty consumers.</li>
+        <li><a href="data.csv">data.csv</a> - CSV formatted.</li>
         <li><a href="latest-linux.json">latest-linux.json</a> - latest Linux.</li>
         <li><a href="latest-windows.json">latest-windows.json</a> - latest Windows.</li>
       </ul>
-      <div>
-        <div class="muted" style="margin-bottom:6px">Schema (per item)</div>
-        <pre><code>{
+      <div class="muted" style="margin-bottom:6px">Schema (per item)</div>
+      <pre><code>{
   "schema": 1,
   "version": "516.1666",
   "platform": "linux" | "windows",
@@ -59,7 +60,6 @@
   "experimental": ["0x…"] | null,
   "build_at": "YYYY-MM-DDTHH:MM:SSZ"
 }</code></pre>
-      </div>
     </section>
 
     <section class="card">
@@ -84,20 +84,32 @@
             <option value="windows">windows</option>
           </select>
         </label>
-        <button id="viewBtn">View</button>
       </div>
+
       <div id="detailArea" style="margin-top:10px;display:none">
         <div class="muted" id="detailMeta"></div>
-        <div style="margin-top:8px">
-          <div class="muted">Curly-brace line</div>
-          <pre class="mono" id="braceLine">{…}</pre>
+
+        <div class="box">
+          <div class="boxhdr">
+            <div class="muted">Addresses</div>
+            <button class="copy" data-copy="#braceLine">Copy</button>
+          </div>
+          <pre id="braceLine">{…}</pre>
         </div>
-        <div style="margin-top:8px" id="expBlock" hidden>
-          <div class="muted">Experimental Addresses</div>
-          <pre class="mono" id="braceLineExp">{…}</pre>
+
+        <div class="box" id="expBlock" hidden>
+          <div class="boxhdr">
+            <div class="muted">Addresses + Experimental Addresses</div>
+            <button class="copy" data-copy="#braceLineExp">Copy</button>
+          </div>
+          <pre id="braceLineExp">{…}</pre>
         </div>
-        <div style="margin-top:8px">
-          <div class="muted">Raw JSON</div>
+
+        <div class="box">
+          <div class="boxhdr">
+            <div class="muted">Raw JSON</div>
+            <button class="copy" data-copy="#rawJson">Copy</button>
+          </div>
           <pre id="rawJson">{}</pre>
         </div>
       </div>
@@ -150,6 +162,7 @@ console.log('addresses', '{' + j.addresses.join(', ') + '}');
   <script>
     let DATA = [];
     const byVP = new Map(); // key: version|platform -> row
+    const $ = (q)=>document.querySelector(q);
 
     function brace(arr){ return '{' + (arr||[]).join(', ') + '}'; }
 
@@ -170,11 +183,10 @@ console.log('addresses', '{' + j.addresses.join(', ') + '}');
         }
         const versions = idx.versions?.slice() || Array.from(verSet);
         versions.sort((a,b)=>{const A=a.split('.').map(Number),B=b.split('.').map(Number);return (B[0]-A[0])||(B[1]-A[1]);});
-        const verSel = document.getElementById('verSelect');
+        const verSel = $('#verSelect');
         verSel.innerHTML = versions.map(v=>`<option value="${v}">${v}</option>`).join('');
 
-        // default platform: prefer linux if present for latest
-        const platSel = document.getElementById('platSelect');
+        const platSel = $('#platSelect');
 
         // Latest badges (linux/windows only)
         const lb = document.getElementById('latestBadges');
@@ -206,19 +218,31 @@ console.log('addresses', '{' + j.addresses.join(', ') + '}');
           tbody.appendChild(tr);
         }
 
-        // defaults for viewer: latest linux if exists, else first version + available plat
+        // defaults for viewer: latest linux if exists, else latest windows, else first
         let defV = versions[0] || '';
-        let defP = (idx.latest?.linux ? 'linux' : (idx.latest?.windows ? 'windows' : 'linux'));
-        if (!byVP.has(`${defV}|${defP}`)) {
-          defP = byVP.has(`${defV}|windows`) ? 'windows' : 'linux';
-        }
+        let defP = idx.latest?.linux ? 'linux' : (idx.latest?.windows ? 'windows' : 'linux');
+        if (!byVP.has(`${defV}|${defP}`)) defP = byVP.has(`${defV}|windows`) ? 'windows' : 'linux';
         verSel.value = defV;
         platSel.value = defP;
         renderDetails(defV, defP);
 
-        document.getElementById('viewBtn').addEventListener('click', ()=>{
-          renderDetails(verSel.value, platSel.value);
+        // Auto-update on select changes
+        verSel.addEventListener('change', ()=>renderDetails(verSel.value, platSel.value));
+        platSel.addEventListener('change', ()=>renderDetails(verSel.value, platSel.value));
+
+        // Clipboard buttons
+        document.querySelectorAll('.copy').forEach(btn=>{
+          btn.addEventListener('click', async ()=>{
+            const target = document.querySelector(btn.dataset.copy);
+            const text = target.textContent;
+            try {
+              await navigator.clipboard.writeText(text);
+              btn.classList.add('ok');
+              setTimeout(()=>btn.classList.remove('ok'), 700);
+            } catch { /* ignore */ }
+          });
         });
+
       } catch (e) {
         document.getElementById('versRows').innerHTML = `<tr><td colspan="3" class="muted">Failed to load: ${e}</td></tr>`;
       }
@@ -230,10 +254,10 @@ console.log('addresses', '{' + j.addresses.join(', ') + '}');
       if (!row){ area.style.display='none'; return; }
       area.style.display='block';
       document.getElementById('detailMeta').textContent = `v${row.version} • ${row.platform} • ${row.build_at||''}`;
-      document.getElementById('braceLine').textContent = brace(row.addresses);
+      document.getElementById('braceLine').textContent = '{' + row.addresses.join(', ') + '}';
       const hasExp = Array.isArray(row.experimental) && row.experimental.length>0;
       document.getElementById('expBlock').hidden = !hasExp;
-      if (hasExp) document.getElementById('braceLineExp').textContent = brace(row.experimental);
+      if (hasExp) document.getElementById('braceLineExp').textContent = '{' + row.experimental.join(', ') + '}';
       document.getElementById('rawJson').textContent = JSON.stringify(row, null, 2);
     }
 
