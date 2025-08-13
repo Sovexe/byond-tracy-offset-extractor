@@ -3,11 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>BYOND Signatures – API Index</title>
+  <title>BYOND Signatures - API Index</title>
   <style>
-  :root {
-    --bg:#111; --card:#1a1a1a; --border:#2a2a2a; --text:#eaeaea; --muted:#9aa4af; --link:#8ab4ff;
-  }
+  :root { --bg:#111; --card:#1a1a1a; --border:#2a2a2a; --text:#eaeaea; --muted:#9aa4af; --link:#8ab4ff; }
   *{box-sizing:border-box}
   html,body{height:100%}
   body{margin:0;font:14px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Noto Sans";background:var(--bg);color:var(--text)}
@@ -27,13 +25,17 @@
   .row:hover{background:rgba(255,255,255,.04)}
   .flex{display:flex;gap:10px;flex-wrap:wrap}
   .right{margin-left:auto}
-</style>
+  .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  select,button{background:#0b0b0b;border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:6px}
+  button{cursor:pointer}
+  .mono{white-space:pre;overflow:auto}
+  </style>
 </head>
 <body>
   <header>
     <div class="wrap">
-      <h1>BYOND Signatures – API & Links</h1>
-      <div class="muted">Static, scraper‑friendly JSON endpoints published by GitHub Actions.</div>
+      <h1>BYOND Signatures - API & Links</h1>
+      <div class="muted">Static, scraper-friendly JSON endpoints published by GitHub Actions.</div>
     </div>
   </header>
 
@@ -44,13 +46,12 @@
         <li><a href="data.json">data.json</a> - full dataset (array of items).</li>
         <li><a href="index.json">index.json</a> - version list + latest pointers.</li>
         <li><a href="data.csv">data.csv</a> - CSV for quick & dirty consumers.</li>
-        <li><a href="latest.json">latest.json</a> - latest across platforms.</li>
         <li><a href="latest-linux.json">latest-linux.json</a> - latest Linux.</li>
         <li><a href="latest-windows.json">latest-windows.json</a> - latest Windows.</li>
       </ul>
       <div>
-  <div class="muted" style="margin-bottom:6px">Schema (per item)</div>
-  <pre><code>{
+        <div class="muted" style="margin-bottom:6px">Schema (per item)</div>
+        <pre><code>{
   "schema": 1,
   "version": "516.1666",
   "platform": "linux" | "windows",
@@ -58,11 +59,7 @@
   "experimental": ["0x…"] | null,
   "build_at": "YYYY-MM-DDTHH:MM:SSZ"
 }</code></pre>
-  <ul class="muted">
-    <li><code>addresses</code> = exactly 11 hex strings with <code>0x</code> prefix.</li>
-    <li><code>experimental</code> may be <code>null</code> or an array of hex strings.</li>
-  </ul>
-</div>
+      </div>
     </section>
 
     <section class="card">
@@ -76,7 +73,38 @@
     </section>
 
     <section class="card">
-      <h3>Per‑Version Files</h3>
+      <h3>View details</h3>
+      <div class="controls">
+        <label>Version
+          <select id="verSelect"></select>
+        </label>
+        <label>Platform
+          <select id="platSelect">
+            <option value="linux">linux</option>
+            <option value="windows">windows</option>
+          </select>
+        </label>
+        <button id="viewBtn">View</button>
+      </div>
+      <div id="detailArea" style="margin-top:10px;display:none">
+        <div class="muted" id="detailMeta"></div>
+        <div style="margin-top:8px">
+          <div class="muted">Curly-brace line</div>
+          <pre class="mono" id="braceLine">{…}</pre>
+        </div>
+        <div style="margin-top:8px" id="expBlock" hidden>
+          <div class="muted">Experimental Addresses</div>
+          <pre class="mono" id="braceLineExp">{…}</pre>
+        </div>
+        <div style="margin-top:8px">
+          <div class="muted">Raw JSON</div>
+          <pre id="rawJson">{}</pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h3>Per-Version Files</h3>
       <div class="muted" style="margin-bottom:8px">Links are generated from <code>data.json</code>. Only present platforms are shown.</div>
       <table>
         <thead>
@@ -88,10 +116,9 @@
 
     <section class="card">
       <h3>Usage Examples</h3>
-      <p class="muted">Copy‑paste friendly snippets for common tools.</p>
       <details open>
         <summary><strong>curl + jq (bash)</strong></summary>
-        <pre><code># Latest Linux curly‑brace line
+        <pre><code># Latest Linux curly-brace line
 curl -sSL ./latest-linux.json \
  | jq -r '.addresses | "{" + (join(", ")) + "}"'
 
@@ -112,33 +139,20 @@ curl -sSL ./index.json | jq -r '.versions[]'
       </details>
       <details>
         <summary><strong>JavaScript</strong></summary>
-        <pre><code>const j = await (await fetch('./latest.json')).json();
+        <pre><code>const j = await (await fetch('./latest-linux.json')).json();
 console.log('version', j.version, 'platform', j.platform);
 console.log('addresses', '{' + j.addresses.join(', ') + '}');
 </code></pre>
       </details>
-      <details>
-        <summary><strong>GitHub Actions (shell)</strong></summary>
-        <pre><code>- name: Get latest linux addresses
-  run: |
-    curl -sSL ${{ github.server_url }}/${{ github.repository }}/blob/gh-pages/latest-linux.json?raw=1 \
-      | jq -r '.addresses | "{" + (join(", ")) + "}"'
-</code></pre>
-      </details>
-    </section>
-
-    <section class="card">
-      <h3>Contract</h3>
-      <ul>
-        <li>Stable paths: <code>data.json</code>, <code>index.json</code>, <code>latest*.json</code>, <code>v/&lt;version&gt;/&lt;platform&gt;.json</code>.</li>
-        <li><code>addresses</code> are hex strings with <code>0x</code> prefix; exactly 11 entries.</li>
-        <li><code>experimental</code> may be <code>null</code> or an array of hex strings.</li>
-        <li>Files under <code>v/&lt;version&gt;/</code> are immutable; <code>data.json</code> is append‑only.</li>
-      </ul>
     </section>
   </main>
 
   <script>
+    let DATA = [];
+    const byVP = new Map(); // key: version|platform -> row
+
+    function brace(arr){ return '{' + (arr||[]).join(', ') + '}'; }
+
     async function load() {
       try {
         const [idxRes, dataRes] = await Promise.all([
@@ -146,41 +160,40 @@ console.log('addresses', '{' + j.addresses.join(', ') + '}');
           fetch('data.json')
         ]);
         const idx = await idxRes.json();
-        const data = await dataRes.json();
+        DATA = await dataRes.json();
 
-        // Latest badges
+        // index maps and selects
+        const verSet = new Set();
+        for (const row of DATA) {
+          verSet.add(row.version);
+          byVP.set(`${row.version}|${row.platform}`, row);
+        }
+        const versions = idx.versions?.slice() || Array.from(verSet);
+        versions.sort((a,b)=>{const A=a.split('.').map(Number),B=b.split('.').map(Number);return (B[0]-A[0])||(B[1]-A[1]);});
+        const verSel = document.getElementById('verSelect');
+        verSel.innerHTML = versions.map(v=>`<option value="${v}">${v}</option>`).join('');
+
+        // default platform: prefer linux if present for latest
+        const platSel = document.getElementById('platSelect');
+
+        // Latest badges (linux/windows only)
         const lb = document.getElementById('latestBadges');
         const parts = [];
         if (idx.latest?.linux) parts.push(`<a class="pill" href="v/${idx.latest.linux}/linux.json">linux: v${idx.latest.linux}</a>`);
         if (idx.latest?.windows) parts.push(`<a class="pill" href="v/${idx.latest.windows}/windows.json">windows: v${idx.latest.windows}</a>`);
-        if (idx.latest?.any) parts.push(`<a class="pill" href="latest.json">any: v${idx.latest.any}</a>`);
         lb.innerHTML = parts.length ? parts.join(' ') : '<span class="muted">No latest entries found.</span>';
 
         // Last updated = max build_at
-        const latestBuild = data.reduce((m,x)=>{
-          const t = Date.parse(x.build_at||'');
-          return isNaN(t)?m:Math.max(m,t);
-        }, 0);
-        if (latestBuild) {
-          const d = new Date(latestBuild).toISOString();
-          document.getElementById('updated').textContent = 'Last updated: ' + d;
-        }
+        const latestBuild = DATA.reduce((m,x)=>{const t=Date.parse(x.build_at||'');return isNaN(t)?m:Math.max(m,t);},0);
+        if (latestBuild) document.getElementById('updated').textContent = 'Last updated: ' + new Date(latestBuild).toISOString();
 
-        // Build version → platforms map
+        // table rows
         const map = new Map();
-        for (const row of data) {
+        for (const row of DATA) {
           const set = map.get(row.version) || new Set();
           set.add(row.platform);
           map.set(row.version, set);
         }
-
-        const versions = idx.versions || Array.from(map.keys());
-        // Sort descending by numeric components
-        versions.sort((a,b)=>{
-          const A=a.split('.').map(Number), B=b.split('.').map(Number);
-          return (B[0]-A[0]) || (B[1]-A[1]);
-        });
-
         const tbody = document.getElementById('versRows');
         tbody.innerHTML='';
         for (const v of versions) {
@@ -192,10 +205,38 @@ console.log('addresses', '{' + j.addresses.join(', ') + '}');
           tr.innerHTML = `<td>v${v}</td><td>${linux}</td><td>${win}</td>`;
           tbody.appendChild(tr);
         }
+
+        // defaults for viewer: latest linux if exists, else first version + available plat
+        let defV = versions[0] || '';
+        let defP = (idx.latest?.linux ? 'linux' : (idx.latest?.windows ? 'windows' : 'linux'));
+        if (!byVP.has(`${defV}|${defP}`)) {
+          defP = byVP.has(`${defV}|windows`) ? 'windows' : 'linux';
+        }
+        verSel.value = defV;
+        platSel.value = defP;
+        renderDetails(defV, defP);
+
+        document.getElementById('viewBtn').addEventListener('click', ()=>{
+          renderDetails(verSel.value, platSel.value);
+        });
       } catch (e) {
         document.getElementById('versRows').innerHTML = `<tr><td colspan="3" class="muted">Failed to load: ${e}</td></tr>`;
       }
     }
+
+    function renderDetails(version, platform){
+      const row = byVP.get(`${version}|${platform}`);
+      const area = document.getElementById('detailArea');
+      if (!row){ area.style.display='none'; return; }
+      area.style.display='block';
+      document.getElementById('detailMeta').textContent = `v${row.version} • ${row.platform} • ${row.build_at||''}`;
+      document.getElementById('braceLine').textContent = brace(row.addresses);
+      const hasExp = Array.isArray(row.experimental) && row.experimental.length>0;
+      document.getElementById('expBlock').hidden = !hasExp;
+      if (hasExp) document.getElementById('braceLineExp').textContent = brace(row.experimental);
+      document.getElementById('rawJson').textContent = JSON.stringify(row, null, 2);
+    }
+
     load();
   </script>
 </body>
