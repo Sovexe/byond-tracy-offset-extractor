@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  Fetch BYOND Builds:
+  fetch_byond_builds:
     runs-on: ubuntu-latest
     env:
       PAGES_BASE: https://sovexe.github.io/byond-tracy-offset-extractor
