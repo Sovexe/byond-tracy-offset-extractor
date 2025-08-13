@@ -26,7 +26,7 @@ You can run the extractor entirely from GitHub using the included Extract Signat
 1. Go to the Actions tab in your fork.
 2. Select Extract Signatures from the left sidebar.
 3. Click Run workflow.
-4. Enter the BYOND versions you want to extract, for example: ["515.1590","515.1591"]
+4. Enter the BYOND versions you want to extract, for example: `["515.1590","515.1591"]`
 5. Start the workflow — results will be in the run’s summary output.
 
 ### Run Locally
@@ -159,4 +159,5 @@ Experimental Addresses:
 
 {0x007EA030, 0x007EA02C, 0x007EA018, 0x007EA014, 0x007E9FD8, 0x007E9FD4, 0x001C002C, 0x00376230, 0x00360E60, 0x0034FA90, 0x00050505, 0x003D2750, 0x0048A550, 0x002D3BD0, 0x002D1940, 0x05050805}
 ```
+
 
