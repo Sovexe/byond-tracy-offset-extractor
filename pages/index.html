@@ -31,13 +31,19 @@
   .boxhdr{display:flex;align-items:center;gap:8px;margin-bottom:6px}
   .copy{margin-left:auto;background:#0b0b0b;border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:6px;cursor:pointer}
   .copy.ok{border-color:#3fb950;box-shadow:0 0 0 2px rgba(63,185,80,.25) inset}
+  footer{border-top:1px solid var(--border);padding:12px 0;margin-top:16px}
   </style>
 </head>
 <body>
   <header>
     <div class="wrap">
       <h1>BYOND Signatures – API & Links</h1>
-      <div class="muted">Static, scraper-friendly JSON endpoints published by GitHub Actions.</div>
+      <div class="muted">
+        Static, scraper-friendly JSON endpoints published by GitHub Actions.
+        &nbsp;•&nbsp;
+        <a href="https://github.com/sovexe/byond-tracy-offset-extractor">Main repository</a>
+        &nbsp;•&nbsp; Built by <strong>Sovexe</strong>
+      </div>
     </div>
   </header>
 
@@ -45,11 +51,14 @@
     <section class="card">
       <h3>Primary Endpoints</h3>
       <ul>
-        <li><a href="data.json">data.json</a> - full dataset (array of items).</li>
-        <li><a href="index.json">index.json</a> - version list + latest pointers.</li>
-        <li><a href="data.csv">data.csv</a> - CSV formatted.</li>
-        <li><a href="latest-linux.json">latest-linux.json</a> - latest Linux.</li>
-        <li><a href="latest-windows.json">latest-windows.json</a> - latest Windows.</li>
+        <li><a href="https://sovexe.github.io/byond-tracy-offset-extractor/data.json">data.json</a> – full dataset (array of items).</li>
+        <li><a href="https://sovexe.github.io/byond-tracy-offset-extractor/index.json">index.json</a> – version list + latest pointers.</li>
+        <li><a href="https://sovexe.github.io/byond-tracy-offset-extractor/data.csv">data.csv</a> – CSV for quick & dirty consumers.</li>
+        <li><a href="https://sovexe.github.io/byond-tracy-offset-extractor/latest-linux.json">latest-linux.json</a> – latest Linux.</li>
+        <li><a href="https://sovexe.github.io/byond-tracy-offset-extractor/latest-windows.json">latest-windows.json</a> – latest Windows.</li>
+        <li><code>v/&lt;version&gt;/&lt;platform&gt;.json</code> – per-version files. Example:
+          <a href="https://sovexe.github.io/byond-tracy-offset-extractor/v/516.1666/linux.json">v/516.1666/linux.json</a>
+        </li>
       </ul>
       <div class="muted" style="margin-bottom:6px">Schema (per item)</div>
       <pre><code>{
@@ -131,32 +140,46 @@
       <details open>
         <summary><strong>curl + jq (bash)</strong></summary>
         <pre><code># Latest Linux curly-brace line
-curl -sSL ./latest-linux.json \
+curl -sSL https://sovexe.github.io/byond-tracy-offset-extractor/latest-linux.json \
  | jq -r '.addresses | "{" + (join(", ")) + "}"'
 
-# Fetch a specific version/platform
-curl -sSL ./v/516.1666/windows.json | jq .
+# Fetch a specific version/platform (Windows example)
+curl -sSL https://sovexe.github.io/byond-tracy-offset-extractor/v/516.1666/windows.json | jq .
 
 # List all versions
-curl -sSL ./index.json | jq -r '.versions[]'
+curl -sSL https://sovexe.github.io/byond-tracy-offset-extractor/index.json | jq -r '.versions[]'
 </code></pre>
       </details>
+
       <details>
         <summary><strong>PowerShell</strong></summary>
-        <pre><code>$j = Invoke-RestMethod -Uri "$PSScriptRoot/data.json"
+        <pre><code>$j = Invoke-RestMethod -Uri "https://sovexe.github.io/byond-tracy-offset-extractor/data.json"
 ($j | Where-Object { $_.platform -eq 'linux' } | Sort-Object {
   $_.version.Split('.') | ForEach-Object {[int]$_}
 } | Select-Object -Last 1).addresses -join ', '
 </code></pre>
       </details>
+
       <details>
-        <summary><strong>JavaScript</strong></summary>
-        <pre><code>const j = await (await fetch('./latest-linux.json')).json();
-console.log('version', j.version, 'platform', j.platform);
-console.log('addresses', '{' + j.addresses.join(', ') + '}');
+        <summary><strong>GitHub Actions (shell)</strong></summary>
+        <pre><code>- name: Fetch latest linux curly-brace line
+  run: |
+    curl -sSL https://sovexe.github.io/byond-tracy-offset-extractor/latest-linux.json \
+      | jq -r '.addresses | "{" + (join(", ")) + "}"'
+
+- name: Use a specific version/platform (example)
+  run: |
+    curl -sSL https://sovexe.github.io/byond-tracy-offset-extractor/v/516.1666/linux.json \
+      | jq -r '.addresses | "{" + (join(", ")) + "}"'
 </code></pre>
       </details>
     </section>
+
+    <footer class="wrap">
+      <div class="muted">
+        © <span id="year"></span> Sovexe — <a href="https://github.com/sovexe/byond-tracy-offset-extractor">github.com/sovexe/byond-tracy-offset-extractor</a>
+      </div>
+    </footer>
   </main>
 
   <script>
@@ -239,9 +262,12 @@ console.log('addresses', '{' + j.addresses.join(', ') + '}');
               await navigator.clipboard.writeText(text);
               btn.classList.add('ok');
               setTimeout(()=>btn.classList.remove('ok'), 700);
-            } catch { /* ignore */ }
+            } catch {}
           });
         });
+
+        // footer year
+        document.getElementById('year').textContent = new Date().getFullYear();
 
       } catch (e) {
         document.getElementById('versRows').innerHTML = `<tr><td colspan="3" class="muted">Failed to load: ${e}</td></tr>`;
