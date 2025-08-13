@@ -55,7 +55,7 @@ jobs:
             return 1
           }
 
-          : > upstream.txt
+          : > upstream.sorted.txt
           while read -r MAJOR; do
             HTML="$(curl -fsS "$BUILDS_BASE/$MAJOR/" || true)"
             [ -z "$HTML" ] && continue
@@ -63,9 +63,7 @@ jobs:
               | grep -oE "$MAJOR\.[0-9]{4}" \
               | sort -u \
               | while read -r VER; do
-                  if have_any_zip "$MAJOR" "$VER"; then
-                    echo "$VER"
-                  fi
+                  have_any_zip "$MAJOR" "$VER" && echo "$VER"
                 done
           done < majors.txt | sort -u > upstream.sorted.txt
 
@@ -108,17 +106,109 @@ jobs:
             echo EOF
           } >> "$GITHUB_OUTPUT"
 
+  # Run the extractor per chunk, but DO NOT publish here.
   extract_chunks:
     needs: fetch_byond_builds
     if: ${{ fromJson(needs.fetch_byond_builds.outputs.count) > 0 }}
     permissions:
       contents: read
-      pages: write
-      id-token: write
     strategy:
       matrix:
         chunk: ${{ fromJson(needs.fetch_byond_builds.outputs.chunks) }}
-      max-parallel: 1
+      # parallel extract is fine; these jobs only upload site fragments
+      max-parallel: 3
     uses: ./.github/workflows/extract_sigs.yml
     with:
       versions: ${{ toJson(matrix.chunk) }}
+      publish: false
+
+  # Single publish job at the very end
+  publish_pages:
+    needs: [fetch_byond_builds, extract_chunks]
+    if: ${{ fromJson(needs.fetch_byond_builds.outputs.count) > 0 }}
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+    steps:
+      - name: Download ALL fragments
+        uses: actions/download-artifact@v4
+        with:
+          pattern: site-fragments-*
+          merge-multiple: true
+          path: fragments
+
+      - name: Build static site files
+        run: |
+          set -euo pipefail
+          mkdir -p public
+
+          # Per-version/per-platform → public/v/<version>/<platform>.json
+          find fragments -name '*.json' -print | sort | while read -r f; do
+            base=$(basename "$f" .json)
+            plat=${base%%-*}
+            ver=${base#*-}
+            mkdir -p "public/v/$ver"
+            jq -c '.' "$f" > "public/v/$ver/$plat.json"
+          done
+
+          # data.json = flattened + sorted
+          if ls public/v/*/*.json >/dev/null 2>&1; then
+            jq -s '[ .[] ]' public/v/*/*.json \
+              | jq 'sort_by(.version | split(".") | map(tonumber)) | sort_by(.platform)' \
+              > public/data.json
+          else
+            echo '[]' > public/data.json
+          fi
+
+          # index.json (versions + latest per-platform)
+          jq -r '.[].version' public/data.json \
+            | sort -t. -k1,1n -k2,2n \
+            | uniq > versions.txt || true
+
+          latest_linux=$(jq -r '
+            [.[] | select(.platform=="linux")]
+            | (max_by(.version | split(".") | map(tonumber)) // empty)
+            | if . == null then "" else .version end
+          ' public/data.json)
+          latest_windows=$(jq -r '
+            [.[] | select(.platform=="windows")]
+            | (max_by(.version | split(".") | map(tonumber)) // empty)
+            | if . == null then "" else .version end
+          ' public/data.json)
+
+          jq -n --argjson versions "$(jq -R -s 'split("\n")[:-1]' versions.txt 2>/dev/null || echo '[]')" \
+                --arg linux "$latest_linux" --arg windows "$latest_windows" \
+            '{schema:1, versions:$versions, latest:{linux:$linux, windows:$windows}}' \
+            > public/index.json
+
+          # latest aliases
+          if [ -n "$latest_linux" ] && [ -f "public/v/$latest_linux/linux.json" ]; then
+            jq -c '.' "public/v/$latest_linux/linux.json" > public/latest-linux.json
+          fi
+          if [ -n "$latest_windows" ] && [ -f "public/v/$latest_windows/windows.json" ]; then
+            jq -c '.' "public/v/$latest_windows/windows.json" > public/latest-windows.json
+          fi
+          if [ -f public/latest-linux.json ]; then
+            cp public/latest-linux.json public/latest.json
+          elif [ -f public/latest-windows.json ]; then
+            cp public/latest-windows.json public/latest.json
+          else
+            echo '{}' > public/latest.json
+          fi
+
+      - name: Copy site assets (index.html etc.)
+        run: |
+          mkdir -p public
+          cp -R pages/* public/ || true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
