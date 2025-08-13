@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  sync:
+  Fetch BYOND Builds:
     runs-on: ubuntu-latest
     env:
       PAGES_BASE: https://sovexe.github.io/byond-tracy-offset-extractor
@@ -30,7 +30,13 @@ jobs:
         run: |
           set -euo pipefail
           curl -fsS "$PAGES_BASE/index.json" -o ours.json || echo '{}' > ours.json
-          echo "ours=$(cat ours.json | jq -c '.')" >> "$GITHUB_OUTPUT"
+          echo "Fetched our index.json:"
+          cat ours.json
+          {
+            echo 'ours<<EOF'
+            jq -c '.' ours.json
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
 
       - name: Get upstream latest version + derive majors
         id: upstream
@@ -57,55 +63,81 @@ jobs:
 
           # Build contiguous set of majors [LO..HI], inclusive
           seq "$LO" "$HI" > majors.txt
-
-          echo "upstream_version=$UPSTREAM_VER" >> "$GITHUB_OUTPUT"
+          echo "Upstream latest version: $UPSTREAM_VER"
           echo "Majors to probe: $(tr '\n' ' ' < majors.txt)"
 
+          {
+            echo "upstream_version<<EOF"
+            echo "$UPSTREAM_VER"
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
 
       - name: Crawl all available builds per major
         id: crawl
         run: |
           set -euo pipefail
-          : > all_upstream.txt
+          : > all_upstream_sorted.txt
+
+          have_any_zip() {
+            local major="$1" ver="$2"
+            local win="$BUILDS_BASE/${major}/${ver}_byond.zip"
+            local lin="$BUILDS_BASE/${major}/${ver}_byond_linux.zip"
+            curl -fsI "$win" >/dev/null 2>&1 && return 0
+            curl -fsI "$lin" >/dev/null 2>&1 && return 0
+            return 1
+          }
+
           while read -r MAJOR; do
-            # Fetch major index; skip if 404
-            if ! HTML="$(curl -fsS "$BUILDS_BASE/$MAJOR/" 2>/dev/null)"; then
-              echo "Skip MAJOR $MAJOR (no page)"
+            HTML="$(curl -fsS "$BUILDS_BASE/$MAJOR/" || true)"
+            if [ -z "$HTML" ]; then
+              echo "Skip MAJOR $MAJOR (no index)"
               continue
             fi
-            # Extract versions
-            echo "$HTML" | grep -oE "$MAJOR\.[0-9]{4}" | sort -u >> all_upstream.txt || true
-          done < majors.txt
+            printf '%s\n' "$HTML" \
+              | grep -oE "$MAJOR\.[0-9]{4}" \
+              | sort -u \
+              | while read -r VER; do
+                  if have_any_zip "$MAJOR" "$VER"; then
+                    echo "$VER"
+                  else
+                    echo "Skip $VER (no linux/windows zip)" >&2
+                  fi
+                done
+          done < majors.txt | sort -u > all_upstream_sorted.txt
 
-          sort -u all_upstream.txt > all_upstream_sorted.txt
           echo "Found upstream versions:"
-          cat all_upstream_sorted.txt
+          cat all_upstream_sorted.txt || true
 
-          echo "list=$(jq -R -s 'split("\n")[:-1]' all_upstream_sorted.txt)" >> "$GITHUB_OUTPUT"
+          LIST_JSON="$(jq -R -s -c 'split("\n")[:-1]' all_upstream_sorted.txt)"
+          {
+            echo 'list<<EOF'
+            echo "$LIST_JSON"
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
 
       - name: Compute missing versions (upstream minus ours)
         id: diff
         run: |
           set -euo pipefail
-          # ours.json: .versions array (may be missing)
-          jq -r '.versions // [] | .[]' ours.json | sort -u > ours_versions.txt || true
-          cat ours_versions.txt
-
+          # ours.json: .versions (may be empty on first run)
+          jq -r '.versions // [] | .[]' ours.json 2>/dev/null | sort -u > ours_versions.txt || true
           # upstream list from previous step
           jq -r '.[]' <<< '${{ steps.crawl.outputs.list }}' | sort -u > upstream_versions.txt
 
-          # set difference
           comm -13 ours_versions.txt upstream_versions.txt > missing.txt || true
           echo "Missing versions:"
           cat missing.txt || true
 
-          # produce JSON array for gh input; accept empty []
           if [ -s missing.txt ]; then
-            MISSING_JSON=$(jq -R -s 'split("\n")[:-1]' missing.txt)
+            MISSING_JSON="$(jq -R -s -c 'split("\n")[:-1]' missing.txt)"
           else
             MISSING_JSON='[]'
           fi
-          echo "json=$MISSING_JSON" >> "$GITHUB_OUTPUT"
+          {
+            echo 'json<<EOF'
+            echo "$MISSING_JSON"
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
 
       - name: Bail out if nothing new
         if: ${{ steps.diff.outputs.json == '[]' }}
@@ -117,24 +149,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # Split into batches so logs stay sane
           jq -r '.[]' <<< '${{ steps.diff.outputs.json }}' > to_run.txt
 
           BATCH_SIZE=15
-          i=0
           mapfile -t VERS < to_run.txt
           TOTAL=${#VERS[@]}
+          i=0
 
           while [ $i -lt $TOTAL ]; do
             CHUNK=( "${VERS[@]:$i:$BATCH_SIZE}" )
             i=$(( i + BATCH_SIZE ))
-            # Make a JSON array string for the workflow input
-            PAYLOAD=$(printf '%s\n' "${CHUNK[@]}" | jq -R -s 'split("\n")[:-1]')
+            PAYLOAD="$(printf '%s\n' "${CHUNK[@]}" | jq -R -s -c 'split("\n")[:-1]')"
 
             echo "Dispatching Extract Signatures for: $PAYLOAD"
-            # Call the workflow by its name as it appears in Actions ("Extract Signatures")
-            gh workflow run "Extract Signatures" \
-              -f versions="$PAYLOAD"
+            gh workflow run "Extract Signatures" -f versions="$PAYLOAD"
 
             # Small delay to avoid spamming
             sleep 2
