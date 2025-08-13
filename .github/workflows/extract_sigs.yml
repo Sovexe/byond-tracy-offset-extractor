@@ -127,7 +127,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: site-fragments
+          name: site-fragments-${{ matrix.os }}-${{ env.BYOND_VERSION }}
           path: site/*.json
           if-no-files-found: ignore
 
