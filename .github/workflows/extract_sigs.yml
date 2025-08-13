@@ -83,3 +83,141 @@ jobs:
         else
           python byond_tracy_offset_extractor.py "${{ steps.determine_target.outputs.target_file }}"
         fi
+
+    - name: Parse curly-brace signatures to JSON
+      run: |
+        set -euo pipefail
+
+        # Find first 11-address brace line
+        SIG_LINE=$(grep -m1 -E '^\{0x[0-9A-Fa-f]{8}(, 0x[0-9A-Fa-f]{8}){10}\}$' extractor.log || true)
+        if [ -z "$SIG_LINE" ]; then
+          echo "No 11-value signature line found; skipping."
+          exit 0
+        fi
+
+        # -> JSON array of strings
+        SIG_JSON=$(echo "$SIG_LINE" \
+          | sed -e 's/^{/["/' -e 's/}$/"]/ ' -e 's/, /", "/g')
+
+        # Experimental brace line (16 values). If none, null.
+        EXP_LINE=$(awk '/^Experimental Addresses:/{f=1;next} f && /^\{0x/{print;f=0}' extractor.log | head -n1)
+        if [ -n "$EXP_LINE" ]; then
+          EXP_JSON=$(echo "$EXP_LINE" \
+            | sed -e 's/^{/["/' -e 's/}$/"]/ ' -e 's/, /", "/g')
+        else
+          EXP_JSON=null
+        fi
+
+        mkdir -p site
+
+        # Build JSON with jq
+        jq -n \
+          --arg version "$BYOND_VERSION" \
+          --arg platform "${{ matrix.os }}" \
+          --arg build_at "$(date -u +%FT%TZ)" \
+          --argjson addresses "$SIG_JSON" \
+          --argjson experimental "$EXP_JSON" \
+          '{schema:1, version:$version, platform:$platform, addresses:$addresses, experimental:$experimental, build_at:$build_at}' \
+          > "site/${{ matrix.os }}-${BYOND_VERSION}.json"
+
+        echo "Wrote site/${{ matrix.os }}-${BYOND_VERSION}.json"
+
+    - name: Upload page fragment
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: site-fragments
+        path: site/*.json
+
+  publish_pages:
+    needs: extract
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Download fragments
+        uses: actions/download-artifact@v4
+        with:
+          name: site-fragments
+          path: site
+
+      - name: Build static site files
+        run: |
+          set -euo pipefail
+          mkdir -p public
+
+          # Per-version/per-platform files under public/v/<version>/<platform>.json
+          while IFS= read -r f; do
+            base=$(basename "$f" .json)          # e.g., linux-516.1666
+            plat=${base%%-*}                     # linux
+            ver=${base#*-}                       # 516.1666
+            mkdir -p "public/v/$ver"
+            jq -c '.' "$f" > "public/v/$ver/$plat.json"
+          done < <(find site -name '*.json' -print | sort)
+
+          # data.json = flattened array of every row (stable order by version asc, then platform)
+          jq -s '[ .[] ]' public/v/*/*.json \
+            | jq 'sort_by(.version | split(".") | map(tonumber)) | sort_by(.platform)' \
+            > public/data.json
+
+          # index.json (list of versions + latest pointers)
+          jq -r '.[].version' public/data.json \
+            | sort -t. -k1,1n -k2,2n \
+            | uniq > versions.txt
+
+          latest=$(tail -n1 versions.txt || echo "")
+          latest_linux=$(jq -r '
+            [.[]|select(.platform=="linux")]
+            | max_by(.version|split(".")|map(tonumber))?.version // empty
+          ' public/data.json)
+          latest_windows=$(jq -r '
+            [.[]|select(.platform=="windows")]
+            | max_by(.version|split(".")|map(tonumber))?.version // empty
+          ' public/data.json)
+
+          jq -n --argjson versions "$(jq -R -s 'split("\n")[:-1]' versions.txt)" \
+                --arg any "$latest" --arg linux "$latest_linux" --arg windows "$latest_windows" \
+            '{schema:1, versions:$versions, latest:{any:$any, linux:$linux, windows:$windows}}' \
+            > public/index.json
+
+          # latest aliases
+          [ -n "$latest_linux" ]   && jq -c '.' "public/v/$latest_linux/linux.json"   > public/latest-linux.json  || true
+          [ -n "$latest_windows" ] && jq -c '.' "public/v/$latest_windows/windows.json" > public/latest-windows.json || true
+          if [ -f public/latest-linux.json ]; then cp public/latest-linux.json public/latest.json
+          elif [ -f public/latest-windows.json ]; then cp public/latest-windows.json public/latest.json
+          fi
+
+          # Optional CSV (easy mode for shells/Excel)
+          jq -r '
+            (["version","platform","addresses"] | @csv),
+            (.[] | [ .version, .platform, (.addresses|join(" ")) ] | @csv)
+          ' public/data.json > public/data.csv
+
+          # Minimal index.html (renders data.json in <pre>)
+          cat > public/index.html <<'HTML'
+          <!doctype html><meta charset="utf-8">
+          <title>BYOND Signatures</title>
+          <h1>BYOND Signatures</h1>
+          <p>version + platform → addresses (hex)</p>
+          <pre id="out">Loading…</pre>
+          <script>
+          fetch('data.json').then(r=>r.json()).then(d=>{
+            document.getElementById('out').textContent = JSON.stringify(d, null, 2);
+          }).catch(e=>{
+            document.getElementById('out').textContent = 'Failed to load data.json: ' + e;
+          });
+          </script>
+          HTML
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
