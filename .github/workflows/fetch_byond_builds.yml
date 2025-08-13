@@ -133,7 +133,7 @@ jobs:
       name: github-pages
     steps:
       - name: Checkout repo (for pages/index.html)
-      - uses: actions/checkout@v4
+        uses: actions/checkout@v4
 
       - name: Download ALL fragments
         uses: actions/download-artifact@v4
