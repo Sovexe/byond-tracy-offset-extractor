@@ -144,7 +144,8 @@ jobs:
       - name: Download fragments
         uses: actions/download-artifact@v4
         with:
-          name: site-fragments
+          pattern: site-fragments-*
+          merge-multiple: true
           path: site
 
       - name: Build static site files
