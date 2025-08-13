@@ -132,6 +132,9 @@ jobs:
     environment:
       name: github-pages
     steps:
+      - name: Checkout repo (for pages/index.html)
+      - uses: actions/checkout@v4
+
       - name: Download ALL fragments
         uses: actions/download-artifact@v4
         with:
@@ -143,8 +146,6 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p public
-
-          # Per-version/per-platform → public/v/<version>/<platform>.json
           find fragments -name '*.json' -print | sort | while read -r f; do
             base=$(basename "$f" .json)
             plat=${base%%-*}
@@ -152,8 +153,6 @@ jobs:
             mkdir -p "public/v/$ver"
             jq -c '.' "$f" > "public/v/$ver/$plat.json"
           done
-
-          # data.json = flattened + sorted
           if ls public/v/*/*.json >/dev/null 2>&1; then
             jq -s '[ .[] ]' public/v/*/*.json \
               | jq 'sort_by(.version | split(".") | map(tonumber)) | sort_by(.platform)' \
@@ -161,47 +160,37 @@ jobs:
           else
             echo '[]' > public/data.json
           fi
-
-          # index.json (versions + latest per-platform)
           jq -r '.[].version' public/data.json \
-            | sort -t. -k1,1n -k2,2n \
-            | uniq > versions.txt || true
-
+            | sort -t. -k1,1n -k2,2n | uniq > versions.txt || true
           latest_linux=$(jq -r '
-            [.[] | select(.platform=="linux")]
-            | (max_by(.version | split(".") | map(tonumber)) // empty)
+            [.[]|select(.platform=="linux")]
+            | (max_by(.version|split(".")|map(tonumber)) // empty)
             | if . == null then "" else .version end
           ' public/data.json)
           latest_windows=$(jq -r '
-            [.[] | select(.platform=="windows")]
-            | (max_by(.version | split(".") | map(tonumber)) // empty)
+            [.[]|select(.platform=="windows")]
+            | (max_by(.version|split(".")|map(tonumber)) // empty)
             | if . == null then "" else .version end
           ' public/data.json)
-
           jq -n --argjson versions "$(jq -R -s 'split("\n")[:-1]' versions.txt 2>/dev/null || echo '[]')" \
                 --arg linux "$latest_linux" --arg windows "$latest_windows" \
-            '{schema:1, versions:$versions, latest:{linux:$linux, windows:$windows}}' \
-            > public/index.json
-
-          # latest aliases
+              '{schema:1, versions:$versions, latest:{linux:$linux, windows:$windows}}' \
+              > public/index.json
           if [ -n "$latest_linux" ] && [ -f "public/v/$latest_linux/linux.json" ]; then
             jq -c '.' "public/v/$latest_linux/linux.json" > public/latest-linux.json
           fi
           if [ -n "$latest_windows" ] && [ -f "public/v/$latest_windows/windows.json" ]; then
             jq -c '.' "public/v/$latest_windows/windows.json" > public/latest-windows.json
           fi
-          if [ -f public/latest-linux.json ]; then
-            cp public/latest-linux.json public/latest.json
-          elif [ -f public/latest-windows.json ]; then
-            cp public/latest-windows.json public/latest.json
-          else
-            echo '{}' > public/latest.json
-          fi
+          if   [ -f public/latest-linux.json ];   then cp public/latest-linux.json   public/latest.json
+          elif [ -f public/latest-windows.json ]; then cp public/latest-windows.json public/latest.json
+          else echo '{}' > public/latest.json; fi
 
       - name: Copy site assets (index.html etc.)
         run: |
-          mkdir -p public
-          cp -R pages/* public/ || true
+          set -euo pipefail
+          test -f pages/index.html || { echo "ERROR: pages/index.html not found"; exit 1; }
+          cp -R pages/* public/
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
