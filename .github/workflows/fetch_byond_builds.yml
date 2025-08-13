@@ -1,0 +1,141 @@
+name: Fetch BYOND Builds
+
+on:
+  schedule:
+    # run every hour
+    - cron: "0 */1 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      PAGES_BASE: https://sovexe.github.io/byond-tracy-offset-extractor
+      BUILDS_BASE: https://spacestation13.github.io/byond-builds
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y jq curl
+
+      - name: Get our current index.json (may be empty on first run)
+        id: ours
+        run: |
+          set -euo pipefail
+          curl -fsS "$PAGES_BASE/index.json" -o ours.json || echo '{}' > ours.json
+          echo "ours=$(cat ours.json | jq -c '.')" >> "$GITHUB_OUTPUT"
+
+      - name: Get upstream latest version + derive majors
+        id: upstream
+        env:
+          MIN_MAJOR: "515" # lower bound of what we support
+        run: |
+          set -euo pipefail
+
+          # latest version known upstream
+          UPSTREAM_VER="$(curl -fsS "$BUILDS_BASE/version.txt" | tr -d '\r\n')"
+          LATEST_MAJOR="${UPSTREAM_VER%%.*}"
+
+          
+          LO="$MIN_MAJOR"
+          HI="$LATEST_MAJOR"
+
+          if ! [[ "$LO" =~ ^[0-9]+$ && "$HI" =~ ^[0-9]+$ ]]; then
+            echo "Bad majors: LO=$LO HI=$HI"; exit 1
+          fi
+          if [ "$HI" -lt "$LO" ]; then
+            echo "Upstream latest major ($HI) is below MIN_MAJOR ($LO) - adjusting to LO"
+            HI="$LO"
+          fi
+
+          # Build contiguous set of majors [LO..HI], inclusive
+          seq "$LO" "$HI" > majors.txt
+
+          echo "upstream_version=$UPSTREAM_VER" >> "$GITHUB_OUTPUT"
+          echo "Majors to probe: $(tr '\n' ' ' < majors.txt)"
+
+
+      - name: Crawl all available builds per major
+        id: crawl
+        run: |
+          set -euo pipefail
+          : > all_upstream.txt
+          while read -r MAJOR; do
+            # Fetch major index; skip if 404
+            if ! HTML="$(curl -fsS "$BUILDS_BASE/$MAJOR/" 2>/dev/null)"; then
+              echo "Skip MAJOR $MAJOR (no page)"
+              continue
+            fi
+            # Extract versions
+            echo "$HTML" | grep -oE "$MAJOR\.[0-9]{4}" | sort -u >> all_upstream.txt || true
+          done < majors.txt
+
+          sort -u all_upstream.txt > all_upstream_sorted.txt
+          echo "Found upstream versions:"
+          cat all_upstream_sorted.txt
+
+          echo "list=$(jq -R -s 'split("\n")[:-1]' all_upstream_sorted.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Compute missing versions (upstream minus ours)
+        id: diff
+        run: |
+          set -euo pipefail
+          # ours.json: .versions array (may be missing)
+          jq -r '.versions // [] | .[]' ours.json | sort -u > ours_versions.txt || true
+          cat ours_versions.txt
+
+          # upstream list from previous step
+          jq -r '.[]' <<< '${{ steps.crawl.outputs.list }}' | sort -u > upstream_versions.txt
+
+          # set difference
+          comm -13 ours_versions.txt upstream_versions.txt > missing.txt || true
+          echo "Missing versions:"
+          cat missing.txt || true
+
+          # produce JSON array for gh input; accept empty []
+          if [ -s missing.txt ]; then
+            MISSING_JSON=$(jq -R -s 'split("\n")[:-1]' missing.txt)
+          else
+            MISSING_JSON='[]'
+          fi
+          echo "json=$MISSING_JSON" >> "$GITHUB_OUTPUT"
+
+      - name: Bail out if nothing new
+        if: ${{ steps.diff.outputs.json == '[]' }}
+        run: echo "No new versions to process. Done."
+
+      - name: Kick "Extract Signatures" for batches of ~15 versions
+        if: ${{ steps.diff.outputs.json != '[]' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Split into batches so logs stay sane
+          jq -r '.[]' <<< '${{ steps.diff.outputs.json }}' > to_run.txt
+
+          BATCH_SIZE=15
+          i=0
+          mapfile -t VERS < to_run.txt
+          TOTAL=${#VERS[@]}
+
+          while [ $i -lt $TOTAL ]; do
+            CHUNK=( "${VERS[@]:$i:$BATCH_SIZE}" )
+            i=$(( i + BATCH_SIZE ))
+            # Make a JSON array string for the workflow input
+            PAYLOAD=$(printf '%s\n' "${CHUNK[@]}" | jq -R -s 'split("\n")[:-1]')
+
+            echo "Dispatching Extract Signatures for: $PAYLOAD"
+            # Call the workflow by its name as it appears in Actions ("Extract Signatures")
+            gh workflow run "Extract Signatures" \
+              -f versions="$PAYLOAD"
+
+            # Small delay to avoid spamming
+            sleep 2
+          done
