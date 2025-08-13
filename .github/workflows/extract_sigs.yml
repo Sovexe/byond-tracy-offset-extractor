@@ -19,6 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     strategy:
+      fail-fast: false
       matrix:
         byond_version: ${{ fromJson(inputs.versions) }}
         os: [windows, linux]
@@ -99,13 +100,11 @@ jobs:
             echo "No address line found in extractor.log"
             ADDR_JSON='[]'
           else
-            ADDR_JSON=$(echo "$SIG_LINE" \
-              | sed -e 's/^{/["/' -e 's/}$/"]/ ' -e 's/, /", "/g')
+            ADDR_JSON=$(echo "$SIG_LINE" | sed -e 's/^{/["/' -e 's/}$/"]/ ' -e 's/, /", "/g')
           fi
 
           if [ -n "$EXP_LINE" ]; then
-            EXP_JSON=$(echo "$EXP_LINE" \
-              | sed -e 's/^{/["/' -e 's/}$/"]/ ' -e 's/, /", "/g')
+            EXP_JSON=$(echo "$EXP_LINE" | sed -e 's/^{/["/' -e 's/}$/"]/ ' -e 's/, /", "/g')
           else
             EXP_JSON=null
           fi
