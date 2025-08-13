@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BYOND Signatures - API Index</title>
+  <style>
+  :root { --bg:#111; --card:#1a1a1a; --border:#2a2a2a; --text:#eaeaea; --muted:#9aa4af; --link:#8ab4ff; }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;font:14px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Noto Sans";background:var(--bg);color:var(--text)}
+  header{position:sticky;top:0;background:#111;border-bottom:1px solid var(--border);padding:12px 0}
+  .wrap{max-width:900px;margin:0 auto;padding:0 16px}
+  h1{margin:0 0 4px;font-size:18px}
+  .muted{color:var(--muted)}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px;margin:12px 0}
+  a{color:var(--link);text-decoration:none}
+  a:hover{text-decoration:underline}
+  code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
+  pre{background:#0b0b0b;border:1px solid var(--border);border-radius:8px;padding:10px;overflow:auto;margin:0}
+  table{width:100%;border-collapse:collapse}
+  th,td{border-bottom:1px solid var(--border);padding:8px 10px;text-align:left}
+  th{color:var(--muted);font-weight:600}
+  .pill{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:2px 8px;margin-right:6px}
+  .row:hover{background:rgba(255,255,255,.04)}
+  .flex{display:flex;gap:10px;flex-wrap:wrap}
+  .right{margin-left:auto}
+  .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  select{background:#0b0b0b;border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:6px}
+  .box{margin-top:8px}
+  .boxhdr{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .copy{margin-left:auto;background:#0b0b0b;border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:6px;cursor:pointer}
+  .copy.ok{border-color:#3fb950;box-shadow:0 0 0 2px rgba(63,185,80,.25) inset}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>BYOND Signatures – API & Links</h1>
+      <div class="muted">Static, scraper-friendly JSON endpoints published by GitHub Actions.</div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="card">
+      <h3>Primary Endpoints</h3>
+      <ul>
+        <li><a href="data.json">data.json</a> - full dataset (array of items).</li>
+        <li><a href="index.json">index.json</a> - version list + latest pointers.</li>
+        <li><a href="data.csv">data.csv</a> - CSV formatted.</li>
+        <li><a href="latest-linux.json">latest-linux.json</a> - latest Linux.</li>
+        <li><a href="latest-windows.json">latest-windows.json</a> - latest Windows.</li>
+      </ul>
+      <div class="muted" style="margin-bottom:6px">Schema (per item)</div>
+      <pre><code>{
+  "schema": 1,
+  "version": "516.1666",
+  "platform": "linux" | "windows",
+  "addresses": ["0x…", "…"],
+  "experimental": ["0x…"] | null,
+  "build_at": "YYYY-MM-DDTHH:MM:SSZ"
+}</code></pre>
+    </section>
+
+    <section class="card">
+      <div class="flex">
+        <div>
+          <h3 style="margin:0 0 6px">Latest</h3>
+          <div id="latestBadges" class="muted">Loading…</div>
+        </div>
+        <div class="right muted" id="updated">&nbsp;</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h3>View details</h3>
+      <div class="controls">
+        <label>Version
+          <select id="verSelect"></select>
+        </label>
+        <label>Platform
+          <select id="platSelect">
+            <option value="linux">linux</option>
+            <option value="windows">windows</option>
+          </select>
+        </label>
+      </div>
+
+      <div id="detailArea" style="margin-top:10px;display:none">
+        <div class="muted" id="detailMeta"></div>
+
+        <div class="box">
+          <div class="boxhdr">
+            <div class="muted">Addresses</div>
+            <button class="copy" data-copy="#braceLine">Copy</button>
+          </div>
+          <pre id="braceLine">{…}</pre>
+        </div>
+
+        <div class="box" id="expBlock" hidden>
+          <div class="boxhdr">
+            <div class="muted">Addresses + Experimental Addresses</div>
+            <button class="copy" data-copy="#braceLineExp">Copy</button>
+          </div>
+          <pre id="braceLineExp">{…}</pre>
+        </div>
+
+        <div class="box">
+          <div class="boxhdr">
+            <div class="muted">Raw JSON</div>
+            <button class="copy" data-copy="#rawJson">Copy</button>
+          </div>
+          <pre id="rawJson">{}</pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h3>Per-Version Files</h3>
+      <div class="muted" style="margin-bottom:8px">Links are generated from <code>data.json</code>. Only present platforms are shown.</div>
+      <table>
+        <thead>
+          <tr><th>Version</th><th>Linux</th><th>Windows</th></tr>
+        </thead>
+        <tbody id="versRows"><tr><td colspan="3" class="muted">Loading…</td></tr></tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h3>Usage Examples</h3>
+      <details open>
+        <summary><strong>curl + jq (bash)</strong></summary>
+        <pre><code># Latest Linux curly-brace line
+curl -sSL ./latest-linux.json \
+ | jq -r '.addresses | "{" + (join(", ")) + "}"'
+
+# Fetch a specific version/platform
+curl -sSL ./v/516.1666/windows.json | jq .
+
+# List all versions
+curl -sSL ./index.json | jq -r '.versions[]'
+</code></pre>
+      </details>
+      <details>
+        <summary><strong>PowerShell</strong></summary>
+        <pre><code>$j = Invoke-RestMethod -Uri "$PSScriptRoot/data.json"
+($j | Where-Object { $_.platform -eq 'linux' } | Sort-Object {
+  $_.version.Split('.') | ForEach-Object {[int]$_}
+} | Select-Object -Last 1).addresses -join ', '
+</code></pre>
+      </details>
+      <details>
+        <summary><strong>JavaScript</strong></summary>
+        <pre><code>const j = await (await fetch('./latest-linux.json')).json();
+console.log('version', j.version, 'platform', j.platform);
+console.log('addresses', '{' + j.addresses.join(', ') + '}');
+</code></pre>
+      </details>
+    </section>
+  </main>
+
+  <script>
+    let DATA = [];
+    const byVP = new Map(); // key: version|platform -> row
+    const $ = (q)=>document.querySelector(q);
+
+    function brace(arr){ return '{' + (arr||[]).join(', ') + '}'; }
+
+    async function load() {
+      try {
+        const [idxRes, dataRes] = await Promise.all([
+          fetch('index.json'),
+          fetch('data.json')
+        ]);
+        const idx = await idxRes.json();
+        DATA = await dataRes.json();
+
+        // index maps and selects
+        const verSet = new Set();
+        for (const row of DATA) {
+          verSet.add(row.version);
+          byVP.set(`${row.version}|${row.platform}`, row);
+        }
+        const versions = idx.versions?.slice() || Array.from(verSet);
+        versions.sort((a,b)=>{const A=a.split('.').map(Number),B=b.split('.').map(Number);return (B[0]-A[0])||(B[1]-A[1]);});
+        const verSel = $('#verSelect');
+        verSel.innerHTML = versions.map(v=>`<option value="${v}">${v}</option>`).join('');
+
+        const platSel = $('#platSelect');
+
+        // Latest badges (linux/windows only)
+        const lb = document.getElementById('latestBadges');
+        const parts = [];
+        if (idx.latest?.linux) parts.push(`<a class="pill" href="v/${idx.latest.linux}/linux.json">linux: v${idx.latest.linux}</a>`);
+        if (idx.latest?.windows) parts.push(`<a class="pill" href="v/${idx.latest.windows}/windows.json">windows: v${idx.latest.windows}</a>`);
+        lb.innerHTML = parts.length ? parts.join(' ') : '<span class="muted">No latest entries found.</span>';
+
+        // Last updated = max build_at
+        const latestBuild = DATA.reduce((m,x)=>{const t=Date.parse(x.build_at||'');return isNaN(t)?m:Math.max(m,t);},0);
+        if (latestBuild) document.getElementById('updated').textContent = 'Last updated: ' + new Date(latestBuild).toISOString();
+
+        // table rows
+        const map = new Map();
+        for (const row of DATA) {
+          const set = map.get(row.version) || new Set();
+          set.add(row.platform);
+          map.set(row.version, set);
+        }
+        const tbody = document.getElementById('versRows');
+        tbody.innerHTML='';
+        for (const v of versions) {
+          const set = map.get(v) || new Set();
+          const tr = document.createElement('tr');
+          tr.className='row';
+          const linux = set.has('linux') ? `<a href="v/${v}/linux.json">linux.json</a>` : '<span class="muted">-</span>';
+          const win   = set.has('windows') ? `<a href="v/${v}/windows.json">windows.json</a>` : '<span class="muted">-</span>';
+          tr.innerHTML = `<td>v${v}</td><td>${linux}</td><td>${win}</td>`;
+          tbody.appendChild(tr);
+        }
+
+        // defaults for viewer: latest linux if exists, else latest windows, else first
+        let defV = versions[0] || '';
+        let defP = idx.latest?.linux ? 'linux' : (idx.latest?.windows ? 'windows' : 'linux');
+        if (!byVP.has(`${defV}|${defP}`)) defP = byVP.has(`${defV}|windows`) ? 'windows' : 'linux';
+        verSel.value = defV;
+        platSel.value = defP;
+        renderDetails(defV, defP);
+
+        // Auto-update on select changes
+        verSel.addEventListener('change', ()=>renderDetails(verSel.value, platSel.value));
+        platSel.addEventListener('change', ()=>renderDetails(verSel.value, platSel.value));
+
+        // Clipboard buttons
+        document.querySelectorAll('.copy').forEach(btn=>{
+          btn.addEventListener('click', async ()=>{
+            const target = document.querySelector(btn.dataset.copy);
+            const text = target.textContent;
+            try {
+              await navigator.clipboard.writeText(text);
+              btn.classList.add('ok');
+              setTimeout(()=>btn.classList.remove('ok'), 700);
+            } catch { /* ignore */ }
+          });
+        });
+
+      } catch (e) {
+        document.getElementById('versRows').innerHTML = `<tr><td colspan="3" class="muted">Failed to load: ${e}</td></tr>`;
+      }
+    }
+
+    function renderDetails(version, platform){
+      const row = byVP.get(`${version}|${platform}`);
+      const area = document.getElementById('detailArea');
+      if (!row){ area.style.display='none'; return; }
+      area.style.display='block';
+      document.getElementById('detailMeta').textContent = `v${row.version} • ${row.platform} • ${row.build_at||''}`;
+      document.getElementById('braceLine').textContent = '{' + row.addresses.join(', ') + '}';
+      const hasExp = Array.isArray(row.experimental) && row.experimental.length>0;
+      document.getElementById('expBlock').hidden = !hasExp;
+      if (hasExp) document.getElementById('braceLineExp').textContent = '{' + row.experimental.join(', ') + '}';
+      document.getElementById('rawJson').textContent = JSON.stringify(row, null, 2);
+    }
+
+    load();
+  </script>
+</body>
+</html>
