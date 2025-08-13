@@ -110,7 +110,7 @@ jobs:
             EXP_JSON=null
           fi
 
-          mkdir -p site
+          mkdir -p fragments
           jq -n \
             --arg version "$BYOND_VERSION" \
             --arg platform "${{ matrix.os }}" \
@@ -118,17 +118,16 @@ jobs:
             --argjson addresses "$ADDR_JSON" \
             --argjson experimental "$EXP_JSON" \
             '{schema:1, version:$version, platform:$platform, addresses:$addresses, experimental:$experimental, build_at:$build_at}' \
-            > "site/${{ matrix.os }}-${BYOND_VERSION}.json"
+            > "fragments/${{ matrix.os }}-${BYOND_VERSION}.json"
 
-          echo "Wrote site/${{ matrix.os }}-${BYOND_VERSION}.json"
-          ls -l site
+          echo "Wrote fragments/${{ matrix.os }}-${BYOND_VERSION}.json"
+          ls -l fragments
 
       - name: Upload page fragment
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: site-fragments-${{ matrix.os }}-${{ env.BYOND_VERSION }}
-          path: site/*.json
+          path: fragments/*.json
           if-no-files-found: ignore
 
   publish_pages:
@@ -146,7 +145,7 @@ jobs:
         with:
           pattern: site-fragments-*
           merge-multiple: true
-          path: site
+          path: fragments
 
       - name: Build static site files
         run: |
@@ -154,7 +153,7 @@ jobs:
           mkdir -p public
 
           # Per-version/per-platform files under public/v/<version>/<platform>.json
-          find site -name '*.json' -print | sort | while read -r f; do
+          find fragments -name '*.json' -print | sort | while read -r f; do
             base=$(basename "$f" .json)   # e.g., linux-516.1666
             plat=${base%%-*}              # linux
             ver=${base#*-}                # 516.1666
@@ -215,21 +214,10 @@ jobs:
             (.[] | [ .version, .platform, (.addresses|join(" ")) ] | @csv)
           ' public/data.json > public/data.csv
 
-          # Minimal index.html (renders data.json)
-          cat > public/index.html <<'HTML'
-          <!doctype html><meta charset="utf-8">
-          <title>BYOND Signatures</title>
-          <h1>BYOND Signatures</h1>
-          <p>version + platform → addresses (hex)</p>
-          <pre id="out">Loading…</pre>
-          <script>
-          fetch('data.json').then(r=>r.json()).then(d=>{
-            document.getElementById('out').textContent = JSON.stringify(d, null, 2);
-          }).catch(e=>{
-            document.getElementById('out').textContent = 'Failed to load data.json: ' + e;
-          });
-          </script>
-          HTML
+      - name: Copy site assets
+        run: |
+          mkdir -p public
+          cp -R pages/* public/ || true
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
