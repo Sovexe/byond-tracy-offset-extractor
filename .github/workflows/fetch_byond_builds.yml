@@ -22,8 +22,8 @@ jobs:
       MIN_MAJOR: "515"
       CHUNK_SIZE: "15"
     outputs:
-      chunks: ${{ steps.prepare_chunks.outputs.chunks }}
-      count: ${{ steps.prepare_chunks.outputs.count }}
+      chunks: ${{ steps.finalize.outputs.chunks }}
+      count:  ${{ steps.finalize.outputs.count }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -72,14 +72,16 @@ jobs:
 
           if [ "$ok_win" -eq 1 ] && [ "$ok_lin" -eq 1 ]; then
             echo "Already published latest ($UPSTREAM_VER) for all upstream platforms; skipping."
-            echo "chunks=[]" >> "$GITHUB_OUTPUT"
-            echo "count=0" >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "skip=true"      >> "$GITHUB_OUTPUT"
+            echo "chunks=[]"      >> "$GITHUB_OUTPUT"
+            echo "count=0"        >> "$GITHUB_OUTPUT"
+          else
+            echo "Not up to date with latest ($UPSTREAM_VER); proceeding."
+            echo "skip=false"     >> "$GITHUB_OUTPUT"
           fi
 
-          echo "Not up to date with latest ($UPSTREAM_VER); proceeding."
-
       - name: Crawl upstream versions (keep if ≥1 ZIP exists)
+        if: ${{ steps.early.outputs.skip != 'true' }}
         run: |
           set -euo pipefail
           have_any_zip() {
@@ -109,6 +111,7 @@ jobs:
 
       - name: Prepare chunks of ${{ env.CHUNK_SIZE }}
         id: prepare_chunks
+        if: ${{ steps.early.outputs.skip != 'true' }}
         run: |
           set -euo pipefail
           # Make a JSON array of all upstream versions
@@ -132,9 +135,24 @@ jobs:
           # Single-line outputs (matrix parser hates newlines)
           CHUNKS_ONE_LINE="$(printf %s "$CHUNKS" | tr -d '\n')"
           echo "chunks=$CHUNKS_ONE_LINE" >> "$GITHUB_OUTPUT"
-          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "count=$COUNT"            >> "$GITHUB_OUTPUT"
 
           echo "Prepared $(jq 'length' <<< "$CHUNKS") chunks from $COUNT versions."
+
+      - name: Finalize job outputs
+        id: finalize
+        run: |
+          set -euo pipefail
+          # Choose outputs from early-skip or from prepared chunks
+          if [ "${{ steps.early.outputs.skip }}" = "true" ]; then
+            echo "chunks=[]" >> "$GITHUB_OUTPUT"
+            echo "count=0"   >> "$GITHUB_OUTPUT"
+            echo "Finalized: skip=true"
+          else
+            echo "chunks=${{ steps.prepare_chunks.outputs.chunks }}" >> "$GITHUB_OUTPUT"
+            echo "count=${{ steps.prepare_chunks.outputs.count }}"   >> "$GITHUB_OUTPUT"
+            echo "Finalized: skip=false"
+          fi
 
   extract_chunks:
     needs: fetch_byond_builds
@@ -153,7 +171,7 @@ jobs:
 
   publish_pages:
     needs: [fetch_byond_builds, extract_chunks]
-    if: ${{ always() && fromJson(needs.fetch_byond_builds.outputs.count) > 0 }}
+    if: ${{ fromJson(needs.fetch_byond_builds.outputs.count) > 0 }}
     runs-on: ubuntu-latest
     permissions:
       pages: write
