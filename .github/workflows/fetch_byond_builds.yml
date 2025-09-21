@@ -166,8 +166,7 @@ jobs:
       max-parallel: 3
     uses: ./.github/workflows/extract_sigs.yml
     with:
-      # Each matrix item is already a JSON array string like ["515.1646","515.1647"]
-      versions: ${{ matrix.versions }}
+      versions: ${{ toJson(matrix.versions) }}
 
   publish_pages:
     needs: [fetch_byond_builds, extract_chunks]
